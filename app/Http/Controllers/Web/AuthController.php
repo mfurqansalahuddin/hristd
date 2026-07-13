@@ -13,7 +13,7 @@ class AuthController extends Controller
      */
     public function showLoginForm()
     {
-        return view('pages.auth.signin', ['title' => 'Sign In']);
+        return view('pages.auth.signin', ['title' => 'Masuk']);
     }
 
     /**
