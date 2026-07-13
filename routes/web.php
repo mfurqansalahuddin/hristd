@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\ApiKeyController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PasswordResetController;
 
@@ -190,13 +189,6 @@ Route::get('/blank', function () {
 })->name('blank');
 
 
-
-Route::get('/api-keys', [ApiKeyController::class, 'index'])->name('api-keys');
-Route::post('/api-keys', [ApiKeyController::class, 'store'])->name('api-keys.store');
-Route::put('/api-keys/{id}', [ApiKeyController::class, 'update'])->name('api-keys.update');
-Route::delete('/api-keys/{id}', [ApiKeyController::class, 'destroy'])->name('api-keys.destroy');
-Route::put('/api-keys/{id}/toggle', [ApiKeyController::class, 'toggleActive'])->name('api-keys.toggle');
-Route::post('/api-keys/{id}/regenerate', [ApiKeyController::class, 'regenerate'])->name('api-keys.regenerate');
 
 Route::get('/integrations', function () {
     return view('pages.integrations', ['title' => 'Integrations']);
