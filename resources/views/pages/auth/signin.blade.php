@@ -6,7 +6,7 @@
             <!-- Form -->
             <div class="flex w-full flex-1 flex-col lg:w-1/2">
                 <div class="mx-auto w-full max-w-md pt-10">
-                    <a href="/ecommerce"
+                    <a href="/admin"
                         class="inline-flex items-center text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
                         <svg class="stroke-current" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
                             viewBox="0 0 20 20" fill="none">
@@ -117,13 +117,6 @@
                                     </div>
                                 </div>
                             </form>
-                            <div class="mt-5">
-                                <p class="text-center text-sm font-normal text-gray-700 sm:text-start dark:text-gray-400">
-                                    Don't have an account?
-                                    <a href="/signup" class="text-brand-500 hover:text-brand-600 dark:text-brand-400">Sign
-                                        Up</a>
-                                </p>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -134,7 +127,7 @@
                     <!-- ===== Common Grid Shape Start ===== -->
                     <x-common.common-grid-shape />
                     <div class="flex max-w-xs flex-col items-center">
-                        <a href="/ecommerce" class="mb-4 block">
+                        <a href="/admin" class="mb-4 block">
                             <img src="./images/logo/auth-logo.svg" alt="Logo" />
                         </a>
                         <p class="text-center text-gray-400 dark:text-white/60">

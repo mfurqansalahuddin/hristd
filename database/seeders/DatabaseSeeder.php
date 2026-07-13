@@ -24,7 +24,7 @@ class DatabaseSeeder extends Seeder
 
         $direktur = User::factory()->create([
             'name' => 'Direktur Utama', 'email' => 'direktur@example.com',
-            'department_id' => $direksi->id, 'job_level' => 1,
+            'department_id' => $direksi->id, 'job_level' => 1, 'is_admin' => true,
         ]);
 
         // Kasus normal: Kabag -> Kasi -> Staf (>1 rekan sejawat)

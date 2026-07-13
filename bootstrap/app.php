@@ -14,7 +14,8 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->trustProxies(at: '*');
-        $middleware->redirectUsersTo('/ecommerce');
+        $middleware->alias(['admin' => \App\Http\Middleware\EnsureUserIsAdmin::class]);
+        $middleware->redirectUsersTo('/admin');
         $middleware->redirectGuestsTo('/signin');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
