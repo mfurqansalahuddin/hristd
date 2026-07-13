@@ -1,8 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
-use App\Http\Controllers\PasswordResetController;
+use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\PasswordResetController;
 
 // dashboard pages
 Route::get('/', function () {

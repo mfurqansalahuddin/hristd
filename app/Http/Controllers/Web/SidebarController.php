@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Web;
 
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
 class SidebarController extends Controller
@@ -92,7 +93,6 @@ class SidebarController extends Controller
                             ['name' => 'File Manager', 'path' => '/file-manager', 'pro' => false],
                             ['name' => 'Pricing Tables', 'path' => '/pricing-tables', 'pro' => false],
                             ['name' => 'Faqs', 'path' => '/faq', 'pro' => false],
-                            ['name' => 'API Keys', 'path' => '/api-keys', 'new' => true],
                             ['name' => 'Integrations', 'path' => '/integrations', 'new' => true],
                             ['name' => 'Blank Page', 'path' => '/blank', 'pro' => false],
                             ['name' => '404 Error', 'path' => '/error-404', 'pro' => false],
