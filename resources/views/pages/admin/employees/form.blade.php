@@ -4,12 +4,22 @@
     <x-common.page-breadcrumb :pageTitle="$title" />
 
     <x-common.component-card :title="$title">
-        <form method="POST"
+        <form method="POST" enctype="multipart/form-data"
             action="{{ $employee->exists ? route('admin.employees.update', $employee) : route('admin.employees.store') }}">
             @csrf
             @if ($employee->exists)
                 @method('PUT')
             @endif
+
+            <div class="mb-5 flex items-center gap-4">
+                <img src="{{ $employee->exists ? $employee->photoUrl() : 'data:image/svg+xml;base64,' . base64_encode('<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 40 40\'><rect width=\'40\' height=\'40\' rx=\'20\' fill=\'#465fff\'/><text x=\'50%\' y=\'50%\' dy=\'.35em\' text-anchor=\'middle\' font-family=\'sans-serif\' font-size=\'16\' fill=\'#fff\'>?</text></svg>') }}"
+                    alt="Foto pegawai" class="h-16 w-16 rounded-full object-cover">
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Foto Pegawai</label>
+                    <input type="file" name="photo" accept="image/*"
+                        class="block text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-500 dark:text-gray-400 dark:file:bg-white/5 dark:file:text-brand-400">
+                </div>
+            </div>
 
             <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <x-form.input name="nik" label="NIK" :value="$employee->nik" required />

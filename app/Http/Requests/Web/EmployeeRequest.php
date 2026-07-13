@@ -29,6 +29,7 @@ class EmployeeRequest extends FormRequest
             'employment_status' => ['required', 'string', 'in:MAGANG,KONTRAK,TETAP'],
             'leave_balance' => ['required', 'integer', 'min:0'],
             'is_admin' => ['sometimes', 'boolean'],
+            'photo' => ['nullable', 'image', 'max:2048'],
         ];
     }
 }

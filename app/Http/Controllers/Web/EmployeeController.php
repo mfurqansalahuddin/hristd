@@ -7,6 +7,7 @@ use App\Http\Requests\Web\EmployeeRequest;
 use App\Models\Department;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 
 class EmployeeController extends Controller
 {
@@ -37,6 +38,11 @@ class EmployeeController extends Controller
         $data = $request->validated();
         $data['password'] = Hash::make($data['password']);
 
+        if ($request->hasFile('photo')) {
+            $data['photo_path'] = $request->file('photo')->store('employees', 'public');
+        }
+        unset($data['photo']);
+
         User::create($data);
 
         return redirect()->route('admin.employees.index')->with('success', 'Pegawai berhasil ditambahkan.');
@@ -61,6 +67,14 @@ class EmployeeController extends Controller
         } else {
             unset($data['password']);
         }
+
+        if ($request->hasFile('photo')) {
+            if ($employee->photo_path) {
+                Storage::disk('public')->delete($employee->photo_path);
+            }
+            $data['photo_path'] = $request->file('photo')->store('employees', 'public');
+        }
+        unset($data['photo']);
 
         $employee->update($data);
 

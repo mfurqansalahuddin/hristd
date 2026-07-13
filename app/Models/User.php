@@ -31,6 +31,7 @@ class User extends Authenticatable
         'employment_status',
         'leave_balance',
         'is_admin',
+        'photo_path',
     ];
 
     /**
@@ -55,6 +56,15 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_admin' => 'boolean',
         ];
+    }
+
+    public function photoUrl(): string
+    {
+        return $this->photo_path
+            ? asset('storage/'.$this->photo_path)
+            : 'data:image/svg+xml;base64,'.base64_encode(
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" rx="20" fill="#465fff"/><text x="50%" y="50%" dy=".35em" text-anchor="middle" font-family="sans-serif" font-size="16" fill="#fff">'.strtoupper(substr($this->name ?? '?', 0, 1)).'</text></svg>'
+            );
     }
 
     public function department()

@@ -34,8 +34,14 @@
                         <tr class="border-b border-gray-100 dark:border-gray-800">
                             <td class="px-5 py-4 sm:px-6"><p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ $employee->nik }}</p></td>
                             <td class="px-5 py-4 sm:px-6">
-                                <span class="block font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $employee->name }}</span>
-                                <span class="block text-gray-500 text-theme-xs dark:text-gray-400">{{ $employee->email }}</span>
+                                <div class="flex items-center gap-3">
+                                    <img src="{{ $employee->photoUrl() }}" alt="{{ $employee->name }}"
+                                        class="h-8 w-8 rounded-full object-cover">
+                                    <div>
+                                        <span class="block font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $employee->name }}</span>
+                                        <span class="block text-gray-500 text-theme-xs dark:text-gray-400">{{ $employee->email }}</span>
+                                    </div>
+                                </div>
                             </td>
                             <td class="px-5 py-4 sm:px-6"><p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ $employee->department?->name ?? '-' }}</p></td>
                             <td class="px-5 py-4 sm:px-6"><p class="text-gray-500 text-theme-sm dark:text-gray-400">{{ $employee->directSupervisor?->name ?? '-' }}</p></td>
