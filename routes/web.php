@@ -5,7 +5,6 @@ use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\EmployeeController;
 use App\Http\Controllers\Web\KpiPeriodController;
 use App\Http\Controllers\Web\LeaveRequestController;
-use App\Http\Controllers\Web\PasswordResetController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -16,15 +15,6 @@ Route::get('/signin', [AuthController::class, 'showLoginForm'])->name('signin');
 Route::post('/signin', [AuthController::class, 'login'])->name('signin.store');
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-
-Route::get('/forgot-password', [PasswordResetController::class, 'showLinkRequestForm'])->name('password.request');
-Route::post('/forgot-password', [PasswordResetController::class, 'sendResetLinkEmail'])->name('password.email');
-Route::get('/reset-password/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset');
-Route::post('/reset-password', [PasswordResetController::class, 'reset'])->name('password.update');
-
-Route::get('/reset-password', function () {
-    return redirect()->route('password.request');
-})->name('reset-password');
 
 // error pages
 Route::get('/error-404', function () {
