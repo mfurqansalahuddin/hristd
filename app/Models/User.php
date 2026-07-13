@@ -19,9 +19,17 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'nik',
         'name',
         'email',
         'password',
+        'department_id',
+        'job_level',
+        'direct_supervisor_id',
+        'final_supervisor_id',
+        'instansi',
+        'employment_status',
+        'leave_balance',
     ];
 
     /**
@@ -45,5 +53,50 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function directSupervisor()
+    {
+        return $this->belongsTo(User::class, 'direct_supervisor_id');
+    }
+
+    public function finalSupervisor()
+    {
+        return $this->belongsTo(User::class, 'final_supervisor_id');
+    }
+
+    public function subordinates()
+    {
+        return $this->hasMany(User::class, 'direct_supervisor_id');
+    }
+
+    public function attendances()
+    {
+        return $this->hasMany(Attendance::class);
+    }
+
+    public function leaveRequests()
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
+    public function currentLocation()
+    {
+        return $this->hasOne(UserCurrentLocation::class);
+    }
+
+    public function kpiPlans()
+    {
+        return $this->hasMany(KpiPlan::class);
+    }
+
+    public function dailyActivities()
+    {
+        return $this->hasMany(DailyActivity::class);
     }
 }

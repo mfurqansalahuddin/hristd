@@ -13,11 +13,22 @@ return new class extends Migration
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
+            $table->string('nik')->unique();
             $table->string('name');
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
             $table->rememberToken();
+
+            $table->foreignId('department_id')->nullable()->constrained()->nullOnDelete();
+            $table->unsignedTinyInteger('job_level'); // 1=Direksi, 2=Kabag/Kacab/Kanit/StafAhli, 3=Kasi, 4=Staf
+            $table->foreignId('direct_supervisor_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('final_supervisor_id')->nullable()->constrained('users')->nullOnDelete();
+
+            $table->string('instansi'); // PERUMDAM_TD, KOPKARTIRTA
+            $table->string('employment_status'); // MAGANG, KONTRAK, TETAP
+            $table->integer('leave_balance')->default(12);
+
             $table->timestamps();
         });
 
