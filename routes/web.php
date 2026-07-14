@@ -1,11 +1,17 @@
 <?php
 
+use App\Http\Controllers\Web\AttendanceController;
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\CutiController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\DinasLuarController;
 use App\Http\Controllers\Web\EmployeeController;
+use App\Http\Controllers\Web\JabatanController;
+use App\Http\Controllers\Web\KpiCategoryController;
 use App\Http\Controllers\Web\KpiPeriodController;
-use App\Http\Controllers\Web\LeaveRequestController;
+use App\Http\Controllers\Web\LocationController;
 use App\Http\Controllers\Web\ProfileController;
+use App\Http\Controllers\Web\SakitController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -38,12 +44,16 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
     Route::resource('employees', EmployeeController::class)->except('show');
+    Route::get('/jabatan', [JabatanController::class, 'index'])->name('jabatan.index');
+    Route::resource('locations', LocationController::class)->except('show');
+
+    Route::get('/attendances', [AttendanceController::class, 'index'])->name('attendances.index');
 
     Route::get('/kpi-periods', [KpiPeriodController::class, 'index'])->name('kpi-periods.index');
-    Route::post('/kpi-periods', [KpiPeriodController::class, 'store'])->name('kpi-periods.store');
-    Route::put('/kpi-periods/{kpiPeriod}/status', [KpiPeriodController::class, 'updateStatus'])->name('kpi-periods.update-status');
 
-    Route::get('/leave-requests', [LeaveRequestController::class, 'index'])->name('leave-requests.index');
-    Route::put('/leave-requests/{leaveRequest}/approve', [LeaveRequestController::class, 'approve'])->name('leave-requests.approve');
-    Route::put('/leave-requests/{leaveRequest}/reject', [LeaveRequestController::class, 'reject'])->name('leave-requests.reject');
+    Route::get('/kpi-categories', [KpiCategoryController::class, 'index'])->name('kpi-categories.index');
+
+    Route::get('/cuti', [CutiController::class, 'index'])->name('cuti.index');
+    Route::get('/sakit', [SakitController::class, 'index'])->name('sakit.index');
+    Route::get('/dinas-luar', [DinasLuarController::class, 'index'])->name('dinas-luar.index');
 });

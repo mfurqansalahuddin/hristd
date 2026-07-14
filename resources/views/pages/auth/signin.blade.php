@@ -23,17 +23,17 @@
                                 Masuk
                             </h1>
                             <p class="text-sm text-gray-500 dark:text-gray-400">
-                                Masukkan email dan kata sandi untuk masuk
+                                Masukkan email/NIK/username dan kata sandi untuk masuk
                             </p>
                         </div>
                         <div>
                             <form action="{{ route('signin.store') }}" method="POST">
                                 @csrf
                                 <div class="space-y-5">
-                                    <!-- Email -->
+                                    <!-- Login -->
                                     <div>
-                                        <x-form.input label="Email" type="email" name="email" id="email"
-                                            placeholder="nama@perumdamtirtadaroy.id" value="{{ old('email') }}"
+                                        <x-form.input label="Email / NIK / Username" type="text" name="login" id="login"
+                                            placeholder="nama@perumdamtirtadaroy.id" value="{{ old('login') }}"
                                             required />
                                     </div>
                                     <!-- Password -->

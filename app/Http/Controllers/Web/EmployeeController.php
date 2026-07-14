@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\EmployeeRequest;
 use App\Models\Department;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 
@@ -13,13 +14,8 @@ class EmployeeController extends Controller
 {
     public function index()
     {
-        $employees = User::with('department', 'directSupervisor')
-            ->orderBy('name')
-            ->paginate(15);
-
         return view('pages.admin.employees.index', [
             'title' => 'Master Pegawai',
-            'employees' => $employees,
         ]);
     }
 
@@ -27,9 +23,8 @@ class EmployeeController extends Controller
     {
         return view('pages.admin.employees.form', [
             'title' => 'Tambah Pegawai',
-            'employee' => new User(),
-            'departments' => Department::orderBy('name')->get(),
-            'supervisors' => User::orderBy('name')->get(),
+            'employee' => new User,
+            'departments' => $this->departmentOptions(),
         ]);
     }
 
@@ -53,8 +48,7 @@ class EmployeeController extends Controller
         return view('pages.admin.employees.form', [
             'title' => 'Edit Pegawai',
             'employee' => $employee,
-            'departments' => Department::orderBy('name')->get(),
-            'supervisors' => User::where('id', '!=', $employee->id)->orderBy('name')->get(),
+            'departments' => $this->departmentOptions($employee),
         ]);
     }
 
@@ -86,5 +80,31 @@ class EmployeeController extends Controller
         $employee->delete();
 
         return redirect()->route('admin.employees.index')->with('success', 'Pegawai berhasil dihapus.');
+    }
+
+    /**
+     * Daftar departemen untuk dropdown kaskade pada form pegawai (§6 plan.md). Departemen
+     * yang sudah punya kepala aktif (job_level 1-3) tetap ditampilkan dan tetap bisa dipilih,
+     * hanya ditandai `occupied_by` sebagai peringatan (bukan dikunci) — supaya mutasi/ganti
+     * jabatan tidak pernah terhalang validasi, admin cukup diberi tahu siapa yang perlu
+     * dipindah lebih dulu.
+     */
+    private function departmentOptions(?User $employee = null): Collection
+    {
+        $departments = Department::orderBy('name')->get(['id', 'name', 'type', 'parent_department_id']);
+        $namesById = $departments->pluck('name', 'id');
+
+        $headsByDepartment = User::whereIn('job_level', [1, 2, 3])
+            ->when($employee?->exists, fn ($query) => $query->where('id', '!=', $employee->id))
+            ->get(['name', 'department_id'])
+            ->keyBy('department_id');
+
+        return $departments->map(fn (Department $department) => [
+            'id' => $department->id,
+            'name' => $department->name,
+            'type' => $department->type,
+            'parent_name' => $namesById->get($department->parent_department_id),
+            'occupied_by' => $headsByDepartment->get($department->id)?->name,
+        ]);
     }
 }

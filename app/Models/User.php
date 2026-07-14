@@ -20,13 +20,12 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'nik',
+        'username',
         'name',
         'email',
         'password',
         'department_id',
         'job_level',
-        'direct_supervisor_id',
-        'final_supervisor_id',
         'instansi',
         'employment_status',
         'leave_balance',
@@ -58,6 +57,28 @@ class User extends Authenticatable
         ];
     }
 
+    public const JOB_LEVEL_LABELS = [
+        1 => 'Direksi',
+        2 => 'Kepala Bagian/Cabang/Unit',
+        3 => 'Kepala Seksi',
+        4 => 'Staf',
+    ];
+
+    public function jobLevelLabel(): string
+    {
+        return self::JOB_LEVEL_LABELS[$this->job_level] ?? (string) $this->job_level;
+    }
+
+    /** Label jabatan spesifik (Kepala Bagian/Kepala Cabang/dst), diturunkan dari tipe departemen. */
+    public function jabatanLabel(): string
+    {
+        if ((int) $this->job_level === 4) {
+            return 'Staf';
+        }
+
+        return $this->department?->headLabel() ?? $this->jobLevelLabel();
+    }
+
     public function photoUrl(): string
     {
         return $this->photo_path
@@ -70,21 +91,6 @@ class User extends Authenticatable
     public function department()
     {
         return $this->belongsTo(Department::class);
-    }
-
-    public function directSupervisor()
-    {
-        return $this->belongsTo(User::class, 'direct_supervisor_id');
-    }
-
-    public function finalSupervisor()
-    {
-        return $this->belongsTo(User::class, 'final_supervisor_id');
-    }
-
-    public function subordinates()
-    {
-        return $this->hasMany(User::class, 'direct_supervisor_id');
     }
 
     public function attendances()

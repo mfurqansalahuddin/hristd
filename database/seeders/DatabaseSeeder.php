@@ -11,61 +11,84 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database.
      *
-     * Membangun struktur organisasi yang mencakup 3 edge case atasan-bawahan
-     * di plan.md: Kasi kosong, Staf Ahli, Unit TI sendirian.
+     * Membangun pohon organisasi riil Perumdam Tirta Daroy sesuai plan.md §3.1:
+     * 3 Direksi, seluruh Bagian/Cabang/Unit/SPI/PAL/Staf Ahli + Seksi terisi penuh
+     * (tidak ada Kabag/Kasi kosong di seeder ini), dan jumlah Staf per Seksi
+     * dibuat bervariasi (1, 2, 3, 4) untuk menutupi kasus solo, mutual (2 orang),
+     * dan siklik (≥3 orang) di aturan rekan sejawat §5.3.
      */
     public function run(): void
     {
-        $direksi = Department::create(['name' => 'Direksi', 'type' => 'PUSAT']);
-        $bagianUmum = Department::create(['name' => 'Bagian Umum', 'type' => 'CABANG']);
-        $bagianKasiKosong = Department::create(['name' => 'Bagian Tanpa Kasi', 'type' => 'CABANG']);
-        $unitTi = Department::create(['name' => 'Unit TI', 'type' => 'UNIT']);
-        $spi = Department::create(['name' => 'SPI', 'type' => 'SPI']);
+        $direkturUtama = Department::create(['name' => 'Direktur Utama', 'type' => 'DIREKSI']);
 
-        $direktur = User::factory()->create([
-            'name' => 'Direktur Utama', 'email' => 'direktur@example.com',
-            'department_id' => $direksi->id, 'job_level' => 1, 'is_admin' => true,
+        $direkturAdm = Department::create([
+            'name' => 'Direktur ADM & Keuangan', 'type' => 'DIREKSI',
+            'parent_department_id' => $direkturUtama->id, 'directorate' => 'KEUANGAN',
         ]);
-
-        // Kasus normal: Kabag -> Kasi -> Staf (>1 rekan sejawat)
-        $kabagUmum = User::factory()->create([
-            'name' => 'Kabag Umum', 'email' => 'kabag.umum@example.com',
-            'department_id' => $bagianUmum->id, 'job_level' => 2,
-            'direct_supervisor_id' => $direktur->id, 'final_supervisor_id' => $direktur->id,
-        ]);
-        $kasiUmum = User::factory()->create([
-            'name' => 'Kasi Umum', 'email' => 'kasi.umum@example.com',
-            'department_id' => $bagianUmum->id, 'job_level' => 3,
-            'direct_supervisor_id' => $kabagUmum->id, 'final_supervisor_id' => $kabagUmum->id,
-        ]);
-        User::factory(3)->create([
-            'department_id' => $bagianUmum->id, 'job_level' => 4,
-            'direct_supervisor_id' => $kasiUmum->id, 'final_supervisor_id' => $kabagUmum->id,
+        $direkturTeknik = Department::create([
+            'name' => 'Direktur Teknik', 'type' => 'DIREKSI',
+            'parent_department_id' => $direkturUtama->id, 'directorate' => 'TEKNIK',
         ]);
 
-        // Edge case: Kasi Kosong -> bobot 33% ditarik Kabag, Kabag pegang 66%
-        $kabagKosong = User::factory()->create([
-            'name' => 'Kabag Tanpa Kasi', 'email' => 'kabag.kosong@example.com',
-            'department_id' => $bagianKasiKosong->id, 'job_level' => 2,
-            'direct_supervisor_id' => $direktur->id, 'final_supervisor_id' => $direktur->id,
-        ]);
-        User::factory(2)->create([
-            'department_id' => $bagianKasiKosong->id, 'job_level' => 4,
-            'direct_supervisor_id' => $kabagKosong->id, 'final_supervisor_id' => $kabagKosong->id,
-        ]);
-
-        // Edge case: Unit TI staf sendirian -> Kanit dapat 100% hak evaluasi kinerja
         User::factory()->create([
-            'name' => 'Kanit TI', 'email' => 'kanit.ti@example.com',
-            'department_id' => $unitTi->id, 'job_level' => 2,
-            'direct_supervisor_id' => $direktur->id, 'final_supervisor_id' => $direktur->id,
+            'name' => 'Direktur Utama', 'username' => 'direktur.utama', 'email' => 'direktur.utama@tirtadaroy.id',
+            'department_id' => $direkturUtama->id, 'job_level' => 1, 'is_admin' => true,
         ]);
+        User::factory()->create(['department_id' => $direkturAdm->id, 'job_level' => 1]);
+        User::factory()->create(['department_id' => $direkturTeknik->id, 'job_level' => 1]);
 
-        // Edge case: Staf Ahli (tanpa bawahan) -> dinilai langsung Direktur Bidang
-        User::factory()->create([
-            'name' => 'Staf Ahli', 'email' => 'staf.ahli@example.com',
-            'department_id' => $spi->id, 'job_level' => 2,
-            'direct_supervisor_id' => $direktur->id, 'final_supervisor_id' => $direktur->id,
-        ]);
+        $bagianDefs = [
+            ['parent' => $direkturAdm, 'name' => 'Bagian Keuangan', 'type' => 'BAGIAN', 'seksi' => ['Seksi Anggaran', 'Seksi Kas/Gaji', 'Seksi Akuntansi']],
+            ['parent' => $direkturAdm, 'name' => 'Bagian Umum', 'type' => 'BAGIAN', 'seksi' => ['Seksi Kepegawaian dan Hukum', 'Seksi Sekretariat dan ADM', 'Seksi Gudang', 'Seksi Perlengkapan']],
+            ['parent' => $direkturAdm, 'name' => 'Bagian Hubungan Pelanggan', 'type' => 'BAGIAN', 'seksi' => ['Seksi Pelayanan Pelanggan', 'Seksi Pembaca Meter', 'Seksi Rekening']],
+            ['parent' => $direkturAdm, 'name' => 'Satuan Pengawas Internal (SPI)', 'type' => 'SPI', 'seksi' => ['Seksi Pengawasan Bidang Umum & Keuangan', 'Seksi Pengawasan Bidang Teknik']],
+            ['parent' => $direkturAdm, 'name' => 'Unit Teknologi Informasi', 'type' => 'UNIT', 'seksi' => []],
+            ['parent' => $direkturAdm, 'name' => 'Staf Ahli Bidang Administrasi', 'type' => 'STAF_AHLI', 'seksi' => []],
+
+            ['parent' => $direkturTeknik, 'name' => 'Bagian Perencanaan Teknik dan Pengawasan Teknik', 'type' => 'BAGIAN', 'seksi' => ['Seksi Perencanaan Teknik', 'Seksi Pengawasan Teknik']],
+            ['parent' => $direkturTeknik, 'name' => 'Bagian Produksi', 'type' => 'BAGIAN', 'seksi' => ['Seksi Operasi', 'Seksi Laboratorium', 'Seksi Pemeliharaan']],
+            ['parent' => $direkturTeknik, 'name' => 'Bagian Transmisi dan Distribusi', 'type' => 'BAGIAN', 'seksi' => ['Seksi Sistem Pendistribusian Air', 'Seksi Penanganan Kebocoran & Pengendalian Kehilangan Air']],
+            ['parent' => $direkturTeknik, 'name' => 'Bagian PAL (Pengolahan Air Limbah)', 'type' => 'PAL', 'seksi' => ['Seksi ADM Bagian Pengolahan Air Limbah', 'Seksi Teknik Bagian Pengolahan Air Limbah']],
+            ['parent' => $direkturTeknik, 'name' => 'Cabang Sultan Iskandar Muda', 'type' => 'CABANG', 'seksi' => ['Seksi Adm Cabang Sultan Iskandar Muda', 'Seksi Teknik Cabang Sultan Iskandar Muda']],
+            ['parent' => $direkturTeknik, 'name' => 'Cabang Teuku Nyak Arief', 'type' => 'CABANG', 'seksi' => ['Seksi Adm Cabang Teuku Nyak Arief', 'Seksi Teknik Cabang Teuku Nyak Arief']],
+            ['parent' => $direkturTeknik, 'name' => 'Cabang Syiah Kuala', 'type' => 'CABANG', 'seksi' => ['Seksi Adm Cabang Syiah Kuala', 'Seksi Teknik Cabang Syiah Kuala']],
+            ['parent' => $direkturTeknik, 'name' => 'Cabang Teuku Umar', 'type' => 'CABANG', 'seksi' => ['Seksi Adm Cabang Teuku Umar', 'Seksi Teknik Cabang Teuku Umar']],
+            ['parent' => $direkturTeknik, 'name' => 'Staf Ahli Bidang Teknik', 'type' => 'STAF_AHLI', 'seksi' => []],
+        ];
+
+        // ponytail: variasi jumlah staf per seksi cukup di-cycle 1..4, tak perlu didaftar manual satu-satu.
+        $staffCountCycle = [1, 2, 3, 4];
+        $cycleIndex = 0;
+
+        foreach ($bagianDefs as $def) {
+            $bagian = Department::create([
+                'name' => $def['name'],
+                'type' => $def['type'],
+                'parent_department_id' => $def['parent']->id,
+            ]);
+
+            User::factory()->create(['department_id' => $bagian->id, 'job_level' => 2]);
+
+            foreach ($def['seksi'] as $seksiName) {
+                $seksi = Department::create([
+                    'name' => $seksiName,
+                    'type' => 'SEKSI',
+                    'parent_department_id' => $bagian->id,
+                ]);
+
+                User::factory()->create(['department_id' => $seksi->id, 'job_level' => 3]);
+
+                $staffCount = $staffCountCycle[$cycleIndex % count($staffCountCycle)];
+                $cycleIndex++;
+                User::factory($staffCount)->create(['department_id' => $seksi->id, 'job_level' => 4]);
+            }
+
+            if ($def['type'] === 'UNIT') {
+                // Kasus solo: staf melekat langsung ke Unit, tanpa Kasi (§3.3).
+                User::factory()->create(['department_id' => $bagian->id, 'job_level' => 4]);
+            }
+        }
+
+        $this->call(AttendanceSeeder::class);
     }
 }

@@ -15,17 +15,35 @@ class MenuHelper
             [
                 'icon' => 'user-profile',
                 'name' => 'Pegawai',
-                'path' => '/admin/employees',
+                'subItems' => [
+                    ['name' => 'Data Pegawai', 'path' => '/admin/employees'],
+                    ['name' => 'Manajemen Jabatan', 'path' => '/admin/jabatan'],
+                ],
             ],
             [
                 'icon' => 'tables',
-                'name' => 'Periode KPI',
-                'path' => '/admin/kpi-periods',
+                'name' => 'KPI',
+                'subItems' => [
+                    ['name' => 'Periode KPI', 'path' => '/admin/kpi-periods'],
+                    ['name' => 'Master Kategori', 'path' => '/admin/kpi-categories'],
+                ],
             ],
             [
                 'icon' => 'calendar',
-                'name' => 'Validasi Cuti',
-                'path' => '/admin/leave-requests',
+                'name' => 'Izin',
+                'subItems' => [
+                    ['name' => 'Cuti', 'path' => '/admin/cuti'],
+                    ['name' => 'Sakit', 'path' => '/admin/sakit'],
+                    ['name' => 'Dinas Luar', 'path' => '/admin/dinas-luar'],
+                ],
+            ],
+            [
+                'icon' => 'location',
+                'name' => 'Absensi',
+                'subItems' => [
+                    ['name' => 'Kehadiran', 'path' => '/admin/attendances'],
+                    ['name' => 'Manajemen Kantor', 'path' => '/admin/locations'],
+                ],
             ],
         ];
     }
@@ -55,6 +73,8 @@ class MenuHelper
             'tables' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M3.25 5.5C3.25 4.25736 4.25736 3.25 5.5 3.25H18.5C19.7426 3.25 20.75 4.25736 20.75 5.5V18.5C20.75 19.7426 19.7426 20.75 18.5 20.75H5.5C4.25736 20.75 3.25 19.7426 3.25 18.5V5.5ZM5.5 4.75C5.08579 4.75 4.75 5.08579 4.75 5.5V8.58325L19.25 8.58325V5.5C19.25 5.08579 18.9142 4.75 18.5 4.75H5.5ZM19.25 10.0833H15.416V13.9165H19.25V10.0833ZM13.916 10.0833L10.083 10.0833V13.9165L13.916 13.9165V10.0833ZM8.58301 10.0833H4.75V13.9165H8.58301V10.0833ZM4.75 18.5V15.4165H8.58301V19.25H5.5C5.08579 19.25 4.75 18.9142 4.75 18.5ZM10.083 19.25V15.4165L13.916 15.4165V19.25H10.083ZM15.416 19.25V15.4165H19.25V18.5C19.25 18.9142 18.9142 19.25 18.5 19.25H15.416Z" fill="currentColor"></path></svg>',
 
             'calendar' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M8 2C8.41421 2 8.75 2.33579 8.75 2.75V3.75H15.25V2.75C15.25 2.33579 15.5858 2 16 2C16.4142 2 16.75 2.33579 16.75 2.75V3.75H18.5C19.7426 3.75 20.75 4.75736 20.75 6V9V19C20.75 20.2426 19.7426 21.25 18.5 21.25H5.5C4.25736 21.25 3.25 20.2426 3.25 19V9V6C3.25 4.75736 4.25736 3.75 5.5 3.75H7.25V2.75C7.25 2.33579 7.58579 2 8 2ZM8 5.25H5.5C5.08579 5.25 4.75 5.58579 4.75 6V8.25H19.25V6C19.25 5.58579 18.9142 5.25 18.5 5.25H16H8ZM19.25 9.75H4.75V19C4.75 19.4142 5.08579 19.75 5.5 19.75H18.5C18.9142 19.75 19.25 19.4142 19.25 19V9.75Z" fill="currentColor"></path></svg>',
+
+            'location' => '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2.75C7.99594 2.75 4.75 5.99594 4.75 10C4.75 15.0263 10.2733 20.4382 11.5661 21.6238C11.8153 21.8524 12.1847 21.8524 12.4339 21.6238C13.7267 20.4382 19.25 15.0263 19.25 10C19.25 5.99594 16.0041 2.75 12 2.75ZM6.25 10C6.25 6.82436 8.82436 4.25 12 4.25C15.1756 4.25 17.75 6.82436 17.75 10C17.75 13.9299 13.9584 18.4335 12 20.2842C10.0416 18.4335 6.25 13.9299 6.25 10ZM12 7.75C10.7574 7.75 9.75 8.75736 9.75 10C9.75 11.2426 10.7574 12.25 12 12.25C13.2426 12.25 14.25 11.2426 14.25 10C14.25 8.75736 13.2426 7.75 12 7.75ZM8.25 10C8.25 7.92893 9.92893 6.25 12 6.25C14.0711 6.25 15.75 7.92893 15.75 10C15.75 12.0711 14.0711 13.75 12 13.75C9.92893 13.75 8.25 12.0711 8.25 10Z" fill="currentColor"></path></svg>',
         ];
 
         return $icons[$iconName] ?? '<svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill="currentColor"/></svg>';

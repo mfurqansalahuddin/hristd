@@ -1,0 +1,80 @@
+<div>
+    @if (session('success'))
+        <div class="mb-6">
+            <x-ui.alert variant="success" :message="session('success')" />
+        </div>
+    @endif
+
+    <div class="mb-6">
+        <x-common.component-card title="Buka Periode KPI Baru">
+            <form wire:submit="store" class="flex flex-wrap items-end gap-4">
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Bulan</label>
+                    <select wire:model="month"
+                        class="dark:bg-dark-900 shadow-theme-xs h-11 w-40 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
+                        @foreach (range(1, 12) as $m)
+                            <option value="{{ $m }}">{{ $m }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <x-form.input name="year" type="number" wire:model="year" label="Tahun" required />
+                <button type="submit"
+                    class="inline-flex items-center justify-center rounded-lg bg-brand-500 px-5 py-3.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                    Buka Periode
+                </button>
+            </form>
+        </x-common.component-card>
+    </div>
+
+    <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]" wire:loading.class="opacity-60">
+        <div class="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:flex-wrap sm:items-end sm:p-6 dark:border-gray-800">
+            <x-common.data-table.per-page-select :options="$perPageOptions" />
+            @if ($status)
+                <button type="button" wire:click="resetFilters" class="text-sm text-gray-500 hover:underline sm:mb-3 dark:text-gray-400">Reset filter</button>
+            @endif
+        </div>
+
+        <div class="max-w-full overflow-x-auto custom-scrollbar">
+            <table class="w-full min-w-[700px]">
+                <thead>
+                    <tr class="border-b border-gray-100 dark:border-gray-800">
+                        <x-common.data-table.th field="year" label="Periode" :sort="$sort" :direction="$direction" />
+                        <x-common.data-table.th label="Status" :active="$status !== ''">
+                            <select wire:model.live="status"
+                                class="dark:bg-dark-900 shadow-theme-xs w-full rounded-lg border border-gray-300 bg-transparent px-2 py-1.5 text-xs text-gray-800 dark:border-gray-700 dark:text-white/90">
+                                <option value="">- Semua -</option>
+                                @foreach (['DRAFT', 'EVALUATION', 'DISPUTE', 'CLOSED'] as $option)
+                                    <option value="{{ $option }}">{{ $option }}</option>
+                                @endforeach
+                            </select>
+                        </x-common.data-table.th>
+                        <x-common.data-table.th label="Ubah Status" />
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($kpiPeriods as $period)
+                        <tr wire:key="kpi-period-{{ $period->id }}" class="border-b border-gray-100 dark:border-gray-800">
+                            <td class="px-5 py-4 sm:px-6"><p class="text-gray-800 text-theme-sm dark:text-white/90">{{ $period->month }}/{{ $period->year }}</p></td>
+                            <td class="px-5 py-4 sm:px-6"><x-ui.badge color="primary">{{ $period->status }}</x-ui.badge></td>
+                            <td class="px-5 py-4 sm:px-6">
+                                <div class="flex items-center gap-2">
+                                    <select wire:model="statusEdits.{{ $period->id }}"
+                                        class="dark:bg-dark-900 shadow-theme-xs h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
+                                        @foreach (['DRAFT', 'EVALUATION', 'DISPUTE', 'CLOSED'] as $status)
+                                            <option value="{{ $status }}" @selected($statusEdits[$period->id] === $status)>{{ $status }}</option>
+                                        @endforeach
+                                    </select>
+                                    <button type="button" wire:click="updateStatus({{ $period->id }})" class="text-sm text-brand-500 hover:underline">Simpan</button>
+                                </div>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+
+        <div class="border-t border-gray-100 px-5 py-4 dark:border-gray-800">
+            {{ $kpiPeriods->links() }}
+        </div>
+    </div>
+</div>

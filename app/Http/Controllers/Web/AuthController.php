@@ -17,24 +17,31 @@ class AuthController extends Controller
     }
 
     /**
-     * Handle an authentication attempt.
+     * Handle an authentication attempt. Login menerima email, NIK, atau username.
      */
     public function login(Request $request)
     {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
+        $request->validate([
+            'login' => ['required', 'string'],
             'password' => ['required'],
         ]);
 
-        if (Auth::attempt($credentials, $request->boolean('remember'))) {
+        $login = $request->string('login')->trim()->toString();
+        $field = match (true) {
+            filter_var($login, FILTER_VALIDATE_EMAIL) !== false => 'email',
+            ctype_digit($login) => 'nik',
+            default => 'username',
+        };
+
+        if (Auth::attempt([$field => $login, 'password' => $request->string('password')->toString()], $request->boolean('remember'))) {
             $request->session()->regenerate();
 
             return redirect()->intended('admin');
         }
 
         return back()->withErrors([
-            'email' => 'The provided credentials do not match our records.',
-        ])->onlyInput('email');
+            'login' => 'The provided credentials do not match our records.',
+        ])->onlyInput('login');
     }
 
     /**

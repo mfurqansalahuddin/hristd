@@ -1,0 +1,170 @@
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+const officeLocationEditor = () => {
+    const container = document.querySelector('#officeLocationMap');
+    if (!container) return;
+
+    // Fix Leaflet default icon paths broken by webpack/vite
+    delete L.Icon.Default.prototype._getIconUrl;
+    L.Icon.Default.mergeOptions({
+        iconRetinaUrl: new URL('leaflet/dist/images/marker-icon-2x.png', import.meta.url).href,
+        iconUrl: new URL('leaflet/dist/images/marker-icon.png', import.meta.url).href,
+        shadowUrl: new URL('leaflet/dist/images/marker-shadow.png', import.meta.url).href,
+    });
+
+    const latInput = document.querySelector('#location-lat');
+    const longInput = document.querySelector('#location-long');
+    const radiusInput = document.querySelector('#location-radius');
+    const polygonInput = document.querySelector('#location-polygon');
+    const polygonCountEl = document.querySelector('#polygon-point-count');
+    const typeRadios = document.querySelectorAll('input[name="type"]');
+
+    // Default: pusat Kota Banda Aceh, dipakai kalau belum ada koordinat tersimpan.
+    const initialLat = parseFloat(latInput.value) || 5.5483;
+    const initialLong = parseFloat(longInput.value) || 95.3238;
+
+    const map = L.map('officeLocationMap', { center: [initialLat, initialLong], zoom: 15 });
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(map);
+
+    let marker = null;
+    let circle = null;
+    let polygonLayer = null;
+    let polygonPoints = [];
+
+    try {
+        polygonPoints = JSON.parse(polygonInput.value || '[]');
+    } catch {
+        polygonPoints = [];
+    }
+
+    const currentType = () => [...typeRadios].find((radio) => radio.checked)?.value || 'RADIUS';
+
+    const updatePolygonCount = () => {
+        if (polygonCountEl) polygonCountEl.textContent = `${polygonPoints.length} titik`;
+    };
+
+    const renderMarker = (lat, lng) => {
+        if (marker) {
+            marker.setLatLng([lat, lng]);
+            return;
+        }
+        marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+        marker.on('dragend', (event) => {
+            const position = event.target.getLatLng();
+            setCenter(position.lat, position.lng);
+        });
+    };
+
+    const renderCircle = (lat, lng, radius) => {
+        if (circle) {
+            circle.setLatLng([lat, lng]);
+            circle.setRadius(radius);
+            return;
+        }
+        circle = L.circle([lat, lng], { radius, color: '#465fff', fillOpacity: 0.15 }).addTo(map);
+    };
+
+    const removeCircle = () => {
+        if (circle) {
+            map.removeLayer(circle);
+            circle = null;
+        }
+    };
+
+    const renderPolygon = () => {
+        if (polygonLayer) {
+            map.removeLayer(polygonLayer);
+            polygonLayer = null;
+        }
+        if (polygonPoints.length > 0) {
+            polygonLayer = L.polygon(polygonPoints.map((point) => [point.lat, point.lng]), {
+                color: '#465fff',
+                fillOpacity: 0.15,
+            }).addTo(map);
+        }
+    };
+
+    const setCenter = (lat, lng) => {
+        latInput.value = lat.toFixed(8);
+        longInput.value = lng.toFixed(8);
+        renderMarker(lat, lng);
+        if (currentType() === 'RADIUS') {
+            renderCircle(lat, lng, parseInt(radiusInput.value || 100, 10));
+        }
+    };
+
+    const syncModeVisuals = () => {
+        if (currentType() === 'RADIUS') {
+            if (polygonLayer) {
+                map.removeLayer(polygonLayer);
+                polygonLayer = null;
+            }
+            const center = marker?.getLatLng();
+            if (center) renderCircle(center.lat, center.lng, parseInt(radiusInput.value || 100, 10));
+        } else {
+            removeCircle();
+            renderPolygon();
+        }
+    };
+
+    if (latInput.value && longInput.value) {
+        renderMarker(initialLat, initialLong);
+        if (currentType() === 'RADIUS') {
+            renderCircle(initialLat, initialLong, parseInt(radiusInput.value || 100, 10));
+        }
+    }
+    if (polygonPoints.length > 0) {
+        renderPolygon();
+        updatePolygonCount();
+    }
+
+    if (radiusInput) {
+        radiusInput.addEventListener('input', () => {
+            if (circle) circle.setRadius(parseInt(radiusInput.value || 0, 10));
+        });
+    }
+
+    typeRadios.forEach((radio) => radio.addEventListener('change', syncModeVisuals));
+
+    map.on('click', (event) => {
+        const { lat, lng } = event.latlng;
+
+        if (currentType() === 'POLYGON') {
+            polygonPoints.push({ lat, lng });
+            polygonInput.value = JSON.stringify(polygonPoints);
+            renderPolygon();
+            updatePolygonCount();
+            renderMarker(lat, lng);
+            latInput.value = lat.toFixed(8);
+            longInput.value = lng.toFixed(8);
+        } else {
+            setCenter(lat, lng);
+        }
+    });
+
+    const undoBtn = document.querySelector('#polygon-undo');
+    if (undoBtn) {
+        undoBtn.addEventListener('click', () => {
+            polygonPoints.pop();
+            polygonInput.value = JSON.stringify(polygonPoints);
+            renderPolygon();
+            updatePolygonCount();
+        });
+    }
+
+    const resetBtn = document.querySelector('#polygon-reset');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            polygonPoints = [];
+            polygonInput.value = '[]';
+            renderPolygon();
+            updatePolygonCount();
+        });
+    }
+};
+
+export default officeLocationEditor;

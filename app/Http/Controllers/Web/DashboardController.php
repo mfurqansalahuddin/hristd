@@ -19,7 +19,7 @@ class DashboardController extends Controller
             'totalEmployees' => User::count(),
             'presentToday' => Attendance::whereDate('date', $today)->whereIn('status', ['HADIR', 'TELAT'])->count(),
             'lateToday' => Attendance::whereDate('date', $today)->where('status', 'TELAT')->count(),
-            'pendingLeaveRequests' => LeaveRequest::where('hr_final_status', 'PENDING')->count(),
+            'pendingLeaveRequests' => LeaveRequest::where('status', 'PENDING')->count(),
             'currentPeriod' => KpiPeriod::orderByDesc('year')->orderByDesc('month')->first(),
         ]);
     }

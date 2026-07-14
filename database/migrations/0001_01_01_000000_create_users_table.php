@@ -25,7 +25,7 @@ return new class extends Migration
             $table->foreignId('direct_supervisor_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('final_supervisor_id')->nullable()->constrained('users')->nullOnDelete();
 
-            $table->string('instansi'); // PERUMDAM_TD, KOPKARTIRTA
+            $table->string('instansi'); // PERUMDAM_TD, KOPKARTIRDA
             $table->string('employment_status'); // MAGANG, KONTRAK, TETAP
             $table->integer('leave_balance')->default(12);
 

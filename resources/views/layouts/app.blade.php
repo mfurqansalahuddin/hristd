@@ -11,6 +11,7 @@
 
     <!-- Scripts -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    @livewireStyles
 
     <!-- Theme Store -->
     <style>
@@ -171,5 +172,6 @@
 </body>
 
 @stack('scripts')
+@livewireScripts
 
 </html>

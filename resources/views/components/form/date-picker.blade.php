@@ -35,7 +35,8 @@
             this.flatpickrInstance = null;
         }
     }
-}" x-init="init()" x-destroy="destroy()">
+}" x-init="init()" x-destroy="destroy()"
+    x-on:datepicker-set-date.window="if ($event.detail.id === '{{ $id }}' && flatpickrInstance) { flatpickrInstance.setDate($event.detail.date); }">
     @if($label)
         <label for="{{ $id }}" class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
             {{ $label }}

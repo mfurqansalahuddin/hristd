@@ -1,5 +1,4 @@
 import { createPopper } from '@popperjs/core';
-import Alpine from 'alpinejs';
 import ApexCharts from 'apexcharts';
 import './bootstrap';
 import './components/popover';
@@ -30,51 +29,51 @@ import { register } from 'swiper/element/bundle';
 register();
 
 
-window.Alpine = Alpine;
 window.createPopper = createPopper;
 window.ApexCharts = ApexCharts;
 window.Prism = Prism;
 window.flatpickr = flatpickr;
 window.FullCalendar = Calendar;
 
+// Livewire bundles and starts its own Alpine instance; registering a second one
+// (importing 'alpinejs' + calling Alpine.start() here) causes "Detected multiple
+// instances of Alpine running" and breaks wire:model bindings across the app.
+document.addEventListener('alpine:init', () => {
+    Alpine.data("dropdown", () => ({
+        open: false,
+        toggle() {
+            this.open = !this.open;
+            if (this.open) this.position();
+        },
+        position() {
+            this.$nextTick(() => {
+                const button = this.$el;
+                const dropdown = this.$refs.dropdown;
+                const rect = button.getBoundingClientRect();
 
-// Register Alpine.js components before initializing
-Alpine.data("dropdown", () => ({
-    open: false,
-    toggle() {
-        this.open = !this.open;
-        if (this.open) this.position();
-    },
-    position() {
-        this.$nextTick(() => {
-            const button = this.$el;
-            const dropdown = this.$refs.dropdown;
-            const rect = button.getBoundingClientRect();
-            
-            // Apply initial styles to ensure measurement is possible
-            dropdown.style.position = "fixed";
-            dropdown.style.zIndex = "999";
-            dropdown.style.right = `${window.innerWidth - rect.right - 13}px`;
+                // Apply initial styles to ensure measurement is possible
+                dropdown.style.position = "fixed";
+                dropdown.style.zIndex = "999";
+                dropdown.style.right = `${window.innerWidth - rect.right - 13}px`;
 
-            const dropdownHeight = Math.max(dropdown.offsetHeight, 0);
-            const spaceBelow = window.innerHeight - rect.bottom;
-            const spaceAbove = rect.top;
+                const dropdownHeight = Math.max(dropdown.offsetHeight, 0);
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const spaceAbove = rect.top;
 
-            if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
-                dropdown.style.top = `${rect.top - dropdownHeight}px`;
-            } else {
-                dropdown.style.top = `${rect.bottom}px`;
-            }
-        });
-    },
-    init() {
-        this.$watch("open", (value) => {
-            if (value) this.position();
-        });
-    },
-}));
-
-Alpine.start();
+                if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+                    dropdown.style.top = `${rect.top - dropdownHeight}px`;
+                } else {
+                    dropdown.style.top = `${rect.bottom}px`;
+                }
+            });
+        },
+        init() {
+            this.$watch("open", (value) => {
+                if (value) this.position();
+            });
+        },
+    }));
+});
 
 // Initialize components on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -96,6 +95,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (document.querySelector('#mapCustomerPinPoint')) {
         import('./components/maps/vector/customer-pin-point-map').then(module => module.default());
+    }
+    if (document.querySelector('#officeLocationMap')) {
+        import('./components/maps/office-location-editor').then(module => module.default());
     }
 
     // Chart imports

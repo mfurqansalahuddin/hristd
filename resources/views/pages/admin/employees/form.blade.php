@@ -1,11 +1,36 @@
 @extends('layouts.app')
 
+@php
+    use App\Models\Department;
+    use App\Models\User;
+@endphp
+
 @section('content')
-    <x-common.page-breadcrumb :pageTitle="$title" />
+    <x-common.page-breadcrumb :pageTitle="$title" :items="[['label' => 'Master Pegawai', 'url' => route('admin.employees.index')]]" />
 
     <x-common.component-card :title="$title">
         <form method="POST" enctype="multipart/form-data"
-            action="{{ $employee->exists ? route('admin.employees.update', $employee) : route('admin.employees.store') }}">
+            action="{{ $employee->exists ? route('admin.employees.update', $employee) : route('admin.employees.store') }}"
+            x-data="{
+                departments: {{ Js::from($departments) }},
+                typesByLevel: {{ Js::from(Department::JOB_LEVEL_TYPES) }},
+                jobLevel: '{{ old('job_level', (string) ($employee->job_level ?? 4)) }}',
+                departmentId: '{{ old('department_id', (string) ($employee->department_id ?? '')) }}',
+                typeLabels: {{ Js::from(Department::TYPE_LABELS) }},
+                get filteredDepartments() {
+                    const types = this.typesByLevel[this.jobLevel] || [];
+                    return this.departments.filter(d => types.includes(d.type));
+                },
+                get selectedDepartment() {
+                    return this.departments.find(d => d.id == this.departmentId) || null;
+                },
+                get specificJabatan() {
+                    if (! this.selectedDepartment || ! ['1', '2', '3'].includes(String(this.jobLevel))) {
+                        return null;
+                    }
+                    return this.typeLabels[this.selectedDepartment.type] || null;
+                }
+            }">
             @csrf
             @if ($employee->exists)
                 @method('PUT')
@@ -23,60 +48,57 @@
 
             <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <x-form.input name="nik" label="NIK" :value="$employee->nik" required />
+                <x-form.input name="username" label="Username" :value="$employee->username" required />
                 <x-form.input name="name" label="Nama" :value="$employee->name" required />
                 <x-form.input name="email" type="email" label="Email" :value="$employee->email" required />
                 <x-form.input name="password" type="password" label="Password"
                     :placeholder="$employee->exists ? 'Kosongkan jika tidak diubah' : ''"
                     :required="! $employee->exists" />
 
+                @if ($employee->exists)
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Jabatan</label>
+                        <select name="job_level" required x-model="jobLevel" @change="departmentId = ''"
+                            class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
+                            @foreach (array_reverse(User::JOB_LEVEL_LABELS, true) as $level => $label)
+                                <option value="{{ $level }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @else
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Jabatan</label>
+                        <input type="text" readonly disabled value="Staf"
+                            class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400" />
+                        <input type="hidden" name="job_level" value="4">
+                        <p class="mt-1.5 text-xs text-gray-400">Pegawai baru selalu mulai sebagai Staf. Untuk menetapkan jabatan (Kabag/Kacab/Kanit/Kasi/Direktur), gunakan menu Manajemen Jabatan setelah pegawai dibuat.</p>
+                    </div>
+                @endif
+
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Departemen</label>
-                    <select name="department_id"
+                    <select name="department_id" required x-model="departmentId"
                         class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
-                        <option value="">- Tidak ada -</option>
-                        @foreach ($departments as $department)
-                            <option value="{{ $department->id }}" @selected($employee->department_id == $department->id)>
-                                {{ $department->name }}
-                            </option>
-                        @endforeach
+                        <option value="">- Pilih -</option>
+                        <template x-for="dept in filteredDepartments" :key="dept.id">
+                            <option :value="dept.id" :selected="dept.id == departmentId"
+                                x-text="dept.occupied_by ? dept.name + ' — sudah dijabat: ' + dept.occupied_by : dept.name"></option>
+                        </template>
                     </select>
+                    <p class="mt-1.5 text-xs text-gray-400" x-show="selectedDepartment && selectedDepartment.occupied_by"
+                        x-text="'Sudah dijabat: ' + (selectedDepartment ? selectedDepartment.occupied_by : '') + '. Tetap bisa disimpan — pastikan pemegang lama sudah dipindah kalau ini mutasi.'"></p>
                 </div>
 
-                <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Level Jabatan</label>
-                    <select name="job_level" required
-                        class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
-                        <option value="1" @selected($employee->job_level == 1)>1 - Direksi</option>
-                        <option value="2" @selected($employee->job_level == 2)>2 - Kabag/Kacab/Kanit/Staf Ahli</option>
-                        <option value="3" @selected($employee->job_level == 3)>3 - Kasi</option>
-                        <option value="4" @selected($employee->job_level == 4 || ! $employee->exists)>4 - Staf</option>
-                    </select>
+                <div x-show="specificJabatan">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Jabatan Spesifik</label>
+                    <input type="text" readonly disabled :value="specificJabatan"
+                        class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400" />
                 </div>
 
-                <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Atasan Langsung</label>
-                    <select name="direct_supervisor_id"
-                        class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
-                        <option value="">- Tidak ada -</option>
-                        @foreach ($supervisors as $supervisor)
-                            <option value="{{ $supervisor->id }}" @selected($employee->direct_supervisor_id == $supervisor->id)>
-                                {{ $supervisor->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Atasan Final (Penilai Akhir)</label>
-                    <select name="final_supervisor_id"
-                        class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
-                        <option value="">- Tidak ada -</option>
-                        @foreach ($supervisors as $supervisor)
-                            <option value="{{ $supervisor->id }}" @selected($employee->final_supervisor_id == $supervisor->id)>
-                                {{ $supervisor->name }}
-                            </option>
-                        @endforeach
-                    </select>
+                <div x-show="selectedDepartment && selectedDepartment.parent_name">
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Induk Departemen</label>
+                    <input type="text" readonly disabled :value="selectedDepartment ? selectedDepartment.parent_name : ''"
+                        class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-gray-50 px-4 py-2.5 text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400" />
                 </div>
 
                 <div>
@@ -84,7 +106,7 @@
                     <select name="instansi" required
                         class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
                         <option value="PERUMDAM_TD" @selected($employee->instansi == 'PERUMDAM_TD')>Perumdam Tirta Daroy</option>
-                        <option value="KOPKARTIRTA" @selected($employee->instansi == 'KOPKARTIRTA')>Kopkar Tirta</option>
+                        <option value="KOPKARTIRDA" @selected($employee->instansi == 'KOPKARTIRDA')>KOPKARTIRDA</option>
                     </select>
                 </div>
 
@@ -92,8 +114,10 @@
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Status Kepegawaian</label>
                     <select name="employment_status" required
                         class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
+                        <option value="PRAMAGANG" @selected($employee->employment_status == 'PRAMAGANG')>Pramagang</option>
                         <option value="MAGANG" @selected($employee->employment_status == 'MAGANG')>Magang</option>
                         <option value="KONTRAK" @selected($employee->employment_status == 'KONTRAK')>Kontrak</option>
+                        <option value="PEGAWAI_80" @selected($employee->employment_status == 'PEGAWAI_80')>Pegawai 80% (transisi Koperasi → Tirta Daroy)</option>
                         <option value="TETAP" @selected($employee->employment_status == 'TETAP' || ! $employee->exists)>Tetap</option>
                     </select>
                 </div>

@@ -38,8 +38,7 @@
 
             <!-- Logo (mobile only) -->
             <a href="/admin" class="xl:hidden">
-                <img class="dark:hidden" src="/images/logo/logo.svg" alt="Logo" />
-                <img class="hidden dark:block" src="/images/logo/logo-dark.svg" alt="Logo" />
+                <img class="h-8 w-auto" src="{{ asset('Logo%20TD%20nobg.png') }}" alt="Logo Perumdam Tirta Daroy" />
             </a>
 
             <!-- Application Menu Toggle (mobile only) -->
