@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Livewire\Concerns\PaginatesRows;
 use App\Livewire\Concerns\SortsColumns;
 use App\Models\KpiPeriod;
+use App\Services\KpiEvaluationService;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -51,7 +52,7 @@ class KpiPeriodsTable extends Component
         session()->flash('success', 'Periode KPI berhasil dibuka.');
     }
 
-    public function updateStatus(int $periodId): void
+    public function updateStatus(int $periodId, KpiEvaluationService $kpiEvaluationService): void
     {
         $status = $this->statusEdits[$periodId] ?? null;
 
@@ -59,7 +60,13 @@ class KpiPeriodsTable extends Component
             'statusEdits.'.$periodId => ['required', 'string', 'in:DRAFT,EVALUATION,DISPUTE,CLOSED'],
         ]);
 
-        KpiPeriod::whereKey($periodId)->update(['status' => $status]);
+        $period = KpiPeriod::findOrFail($periodId);
+        $period->update(['status' => $status]);
+
+        // Fase C (plan.md §12): transisi ke CLOSED memicu hitung kpi_final_scores dari 5 bucket (§7).
+        if ($status === 'CLOSED') {
+            $kpiEvaluationService->calculateForPeriod($period);
+        }
 
         session()->flash('success', 'Status periode KPI diperbarui.');
     }

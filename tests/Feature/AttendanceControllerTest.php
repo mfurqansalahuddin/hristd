@@ -61,7 +61,7 @@ test('filter status terlambat hanya menampilkan pegawai yang terlambat', functio
     $late = User::factory()->create(['name' => 'Siti Telat']);
     Attendance::factory()->create(['user_id' => $late->id, 'date' => '2026-07-14', 'clock_in' => '2026-07-14 08:30:00']);
 
-    $response = $this->actingAs($admin)->get('/admin/attendances?date=2026-07-14&status=TERLAMBAT');
+    $response = $this->actingAs($admin)->get('/admin/attendances?date=2026-07-14&statusMasuk=TERLAMBAT');
 
     $response->assertOk();
     $response->assertSeeText('Siti Telat');

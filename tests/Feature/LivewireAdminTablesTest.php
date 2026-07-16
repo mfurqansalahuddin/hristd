@@ -75,10 +75,31 @@ test('attendances table filters by status realtime', function () {
         ->set('date', '2026-07-14')
         ->assertSee('Budi Ontime')
         ->assertSee('Siti Telat')
-        ->set('status', 'TERLAMBAT')
+        ->set('statusMasuk', 'TERLAMBAT')
         ->assertSee('Siti Telat')
         ->assertDontSee('Budi Ontime')
         ->assertNoRedirect();
+});
+
+test('hr bisa approve/reject kehadiran yang telat dari tabel admin', function () {
+    $admin = User::factory()->create(['is_admin' => true]);
+    $late = User::factory()->create(['name' => 'Siti Telat']);
+    $attendance = Attendance::factory()->create([
+        'user_id' => $late->id, 'date' => '2026-07-14', 'clock_in' => '2026-07-14 08:30:00',
+        'supervisor_approval' => 'PENDING',
+    ]);
+
+    Livewire::actingAs($admin)->test(AttendancesTable::class, ['date' => '2026-07-14'])
+        ->call('approve', $attendance->id)
+        ->assertNoRedirect();
+
+    expect($attendance->fresh()->supervisor_approval)->toBe('APPROVED');
+
+    Livewire::actingAs($admin)->test(AttendancesTable::class, ['date' => '2026-07-14'])
+        ->call('reject', $attendance->id)
+        ->assertNoRedirect();
+
+    expect($attendance->fresh()->supervisor_approval)->toBe('REJECTED');
 });
 
 test('kpi categories panel updates weights and manages integrity categories live', function () {

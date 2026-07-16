@@ -90,8 +90,12 @@ class AttendanceSeeder extends Seeder
             'clock_out_long' => $clockOutLong,
             'is_apel' => $isApel,
             'status' => $status,
-            'late_reason' => $isLate ? fake()->randomElement(['Macet di jalan', 'Urusan keluarga', 'Kendaraan mogok', 'Antar anak sekolah']) : null,
-            'supervisor_approval' => $isLate ? fake()->randomElement(['PENDING', 'APPROVED', 'REJECTED']) : 'APPROVED',
+            'approval_reason' => $isLate
+                ? fake()->randomElement(['Macet di jalan', 'Urusan keluarga', 'Kendaraan mogok', 'Antar anak sekolah'])
+                : ($isEarlyLeave ? fake()->randomElement(['Antar anak sekolah', 'Urusan keluarga mendadak', 'Sakit ringan']) : null),
+            // ponytail: koordinat luar-geofence sudah acak di seeder ini, tapi belum dikaitkan
+            // ke supervisor_approval di sini — tambahkan kalau butuh data uji utk kasus itu juga.
+            'supervisor_approval' => ($isLate || $isEarlyLeave) ? fake()->randomElement(['PENDING', 'APPROVED', 'REJECTED']) : 'APPROVED',
         ]);
     }
 

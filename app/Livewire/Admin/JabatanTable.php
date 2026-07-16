@@ -123,6 +123,13 @@ class JabatanTable extends Component
             return;
         }
 
+        if ($userId === '__none__') {
+            $this->vacate($departmentId);
+            unset($this->selected[$departmentId]);
+
+            return;
+        }
+
         $department = Department::findOrFail($departmentId);
 
         User::findOrFail($userId)->update([

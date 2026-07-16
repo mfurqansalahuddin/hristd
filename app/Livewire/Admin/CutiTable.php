@@ -80,7 +80,7 @@ class CutiTable extends Component
             'newEndDate' => ['required', 'date', 'after_or_equal:newStartDate'],
             'newReason' => ['required', 'string', 'max:1000'],
             'newStatus' => ['required', 'in:PENDING,APPROVED,REJECTED'],
-            'newAttachment' => ['nullable', 'file', 'max:5120'],
+            'newAttachment' => ['nullable', 'file', 'mimes:pdf', 'max:5120'],
         ]);
 
         $leaveRequest = LeaveRequest::create([
@@ -118,7 +118,7 @@ class CutiTable extends Component
     public function confirmApprove(AttendanceService $attendanceService): void
     {
         $this->validate([
-            'approveAttachment' => ['required', 'file', 'max:5120'],
+            'approveAttachment' => ['required', 'file', 'mimes:pdf', 'max:5120'],
         ]);
 
         $leaveRequest = LeaveRequest::findOrFail($this->approvingId);

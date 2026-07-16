@@ -14,7 +14,10 @@
         this.$nextTick(() => {
             this.flatpickrInstance = flatpickr(this.$refs.dateInput, {
                 mode: '{{ $mode }}',
-                static: true,
+                // ponytail: appendTo document.body (flatpickr default when `static` is omitted) so the
+                // calendar escapes any ancestor's overflow-hidden/overflow-x-auto (table cards, scroll
+                // wrappers) instead of getting clipped by them; flatpickr auto-flips above the input
+                // when there isn't room below, computed against the viewport, not the ancestor box.
                 disableMobile: true,
                 monthSelectorType: 'static',
                 dateFormat: '{{ $dateFormat }}',

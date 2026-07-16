@@ -8,7 +8,7 @@ class KpiPlan extends Model
 {
     protected $fillable = [
         'user_id', 'period_id', 'target_description', 'weight',
-        'self_assessment_score', 'self_assessment_note', 'status',
+        'self_assessment_score', 'self_assessment_note', 'self_assessment_photo_path', 'status',
     ];
 
     public function user()

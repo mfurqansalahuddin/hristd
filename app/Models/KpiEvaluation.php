@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class KpiEvaluation extends Model
 {
-    protected $fillable = ['kpi_plan_id', 'evaluator_id', 'evaluator_role', 'score'];
+    protected $fillable = ['kpi_plan_id', 'evaluator_id', 'evaluator_role', 'score', 'note'];
 
     public function kpiPlan()
     {

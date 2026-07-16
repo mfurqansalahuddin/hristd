@@ -65,6 +65,9 @@
                                 <option value="CEPAT">Pulang Cepat</option>
                             </select>
                         </x-common.data-table.th>
+                        <th class="px-5 py-3 text-left sm:px-6">
+                            <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Approval HR</p>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -74,6 +77,10 @@
                             $clockOutLocation = $attendance->matchedLocation('clock_out', $locations);
                             $statusMasuk = $attendance->statusMasuk();
                             $statusPulang = $attendance->statusPulang();
+                            $needsApproval = $statusMasuk === 'TERLAMBAT'
+                                || $statusPulang === 'CEPAT'
+                                || ($attendance->clock_in && ! $clockInLocation)
+                                || ($attendance->clock_out && ! $clockOutLocation);
                         @endphp
                         <tr wire:key="attendance-{{ $attendance->id }}" class="border-b border-gray-100 dark:border-gray-800">
                             <td class="px-5 py-4 sm:px-6"><p class="font-medium text-gray-800 text-theme-sm dark:text-white/90">{{ $attendance->user?->name }}</p></td>
@@ -108,10 +115,26 @@
                                     <p class="text-gray-400 text-theme-sm">-</p>
                                 @endif
                             </td>
+                            <td class="px-5 py-4 sm:px-6">
+                                @if (! $needsApproval)
+                                    <p class="text-gray-400 text-theme-sm">-</p>
+                                @elseif ($attendance->supervisor_approval === 'PENDING')
+                                    <div class="flex items-center gap-2" title="{{ $attendance->approval_reason }}">
+                                        <button type="button" wire:click="approve({{ $attendance->id }})"
+                                            class="rounded-lg bg-success-50 px-2.5 py-1.5 text-xs font-medium text-success-600 hover:bg-success-100 dark:bg-success-500/15 dark:text-success-500">Approve</button>
+                                        <button type="button" wire:click="reject({{ $attendance->id }})"
+                                            class="rounded-lg bg-error-50 px-2.5 py-1.5 text-xs font-medium text-error-600 hover:bg-error-100 dark:bg-error-500/15 dark:text-error-500">Tolak</button>
+                                    </div>
+                                @elseif ($attendance->supervisor_approval === 'APPROVED')
+                                    <x-ui.badge color="success">Disetujui</x-ui.badge>
+                                @else
+                                    <x-ui.badge color="error">Ditolak</x-ui.badge>
+                                @endif
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="px-5 py-8 text-center text-sm text-gray-500 dark:text-gray-400">Tidak ada data kehadiran pada tanggal ini.</td>
+                            <td colspan="9" class="px-5 py-8 text-center text-sm text-gray-500 dark:text-gray-400">Tidak ada data kehadiran pada tanggal ini.</td>
                         </tr>
                     @endforelse
                 </tbody>

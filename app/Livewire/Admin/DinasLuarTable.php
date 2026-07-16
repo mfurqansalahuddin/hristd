@@ -63,7 +63,7 @@ class DinasLuarTable extends Component
             'newStartDate' => ['required', 'date'],
             'newEndDate' => ['required', 'date', 'after_or_equal:newStartDate'],
             'newReason' => ['required', 'string', 'max:1000'],
-            'newAttachment' => ['required', 'file', 'max:5120'],
+            'newAttachment' => ['required', 'file', 'mimes:pdf', 'max:5120'],
         ]);
 
         $attachmentPath = $this->newAttachment->store('leave-requests', 'public');

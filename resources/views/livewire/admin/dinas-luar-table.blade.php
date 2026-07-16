@@ -16,31 +16,25 @@
 
     @if ($showCreateForm)
         <div class="mb-6 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-            <h3 class="mb-4 text-base font-medium text-gray-800 dark:text-white/90">Input Dinas Luar (1 SPPD, boleh banyak pegawai)</h3>
+            <h3 class="mb-4 text-base font-medium text-gray-800 dark:text-white/90">Input Dinas Luar</h3>
             <form wire:submit="createDinasLuar" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div class="sm:col-span-2">
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Pegawai (bisa pilih lebih dari satu)</label>
-                    <select wire:model="newUserIds" multiple size="6"
-                        class="dark:bg-dark-900 shadow-theme-xs w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
-                        @foreach ($employees as $employee)
-                            <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->nik }})</option>
-                        @endforeach
-                    </select>
-                    <p class="mt-1.5 text-xs text-gray-400">Kalau tanggal beda-beda per pegawai, input terpisah per kelompok tanggal (§16.4 plan.md).</p>
-                    @error('newUserIds') <p class="mt-1 text-xs text-error-500">{{ $message }}</p> @enderror
+                    <x-form.person-select name="newUserIds" :options="$employees" multiple wire:key="new-user-ids-picker" />
+
                 </div>
 
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Tanggal Mulai</label>
-                    <input type="date" wire:model="newStartDate"
-                        class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90" />
+                    <div wire:ignore x-on:date-change="$wire.set('newStartDate', $event.detail.dateStr)">
+                        <x-form.date-picker id="dinasluar-start-date" label="Tanggal Mulai" :default-date="$newStartDate ?: null" date-format="Y-m-d" />
+                    </div>
                     @error('newStartDate') <p class="mt-1 text-xs text-error-500">{{ $message }}</p> @enderror
                 </div>
 
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Tanggal Selesai</label>
-                    <input type="date" wire:model="newEndDate"
-                        class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90" />
+                    <div wire:ignore x-on:date-change="$wire.set('newEndDate', $event.detail.dateStr)">
+                        <x-form.date-picker id="dinasluar-end-date" label="Tanggal Selesai" :default-date="$newEndDate ?: null" date-format="Y-m-d" />
+                    </div>
                     @error('newEndDate') <p class="mt-1 text-xs text-error-500">{{ $message }}</p> @enderror
                 </div>
 
@@ -52,8 +46,8 @@
                 </div>
 
                 <div class="sm:col-span-2">
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">SPPD / Surat Pengantar</label>
-                    <input type="file" wire:model="newAttachment"
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">SPPD / Surat Pengantar (PDF)</label>
+                    <input type="file" wire:model="newAttachment" accept="application/pdf"
                         class="dark:bg-dark-900 shadow-theme-xs w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90" />
                     @error('newAttachment') <p class="mt-1 text-xs text-error-500">{{ $message }}</p> @enderror
                 </div>

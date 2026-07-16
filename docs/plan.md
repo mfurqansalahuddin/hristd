@@ -24,6 +24,38 @@
 > atasan pertama untuk Sakit). Panel admin (`CutiController`/`SakitController`/
 > `DinasLuarController` + Livewire table masing-masing) **dibangun di sesi ini**; bagian
 > mobile (§16.7–16.8) masih dokumentasi, menyusul Fase D/E.
+>
+> **Update 2026-07-15 (revisi §5, dibatalkan):** perubahan 4-penilai Kasi dari
+> 2026-07-14 **dibatalkan**. Kasi kembali ke **3 penilai**: Kabag, Direktur Bidang,
+> Rekan sesama Kasi — bobot balik ke 33/33/34 (sama seperti Staf & Kabag-setara).
+> Direktur Utama dikeluarkan dari daftar penilai Kasi; Dirut tetap menilai
+> Kabag-setara seperti semula, tidak berubah. Belum ada kode kalkulasi
+> (`EvaluatorResolutionService`/`KpiEvaluationService`) yang perlu disesuaikan —
+> keduanya masih belum dibangun (§11) — jadi revisi ini murni dokumentasi.
+>
+> **Update 2026-07-16 (detail layar mobile & beberapa keputusan baru):**
+> pendalaman spesifikasi §14 (Home, Live Location, KPI Bulanan) dan §16 (Izin) —
+> detail per-layar lengkap dipindah ke `docs/mobile-app.md`, dokumen ini hanya
+> memuat ringkasan + keputusan yang berdampak ke bagian lain. Poin yang berubah
+> dari desain sebelumnya (dikonfirmasi user):
+> 1. **Approval Kehadiran pindah ke HR, bukan atasan** — telat masuk, pulang
+>    cepat, maupun di luar geofence, ketiganya sekarang perlu approval **HR**
+>    lewat tombol baru di tab admin Kehadiran (§8.1, §2). Alur "atasan approve
+>    absen telat" yang sempat disebut di §4 sebagai contoh pemakaian
+>    `EvaluatorResolutionService` **tidak jadi dipakai** — dihapus dari §4.
+> 2. **Live Location — cakupan switch "bawahan" untuk Kasi diperluas** ke
+>    seluruh Bagian induknya (bukan cuma Seksi yang dia pimpin sendiri) — lihat
+>    §14.4.
+> 3. **Sanggah (Dispute) KPI jadi tampilan saja, tanpa form submit** — app
+>    cuma menampilkan skor + alasan tiap penilai selama window sanggah
+>    terbuka; sanggahan sesungguhnya diselesaikan di luar app (one-on-one
+>    dengan atasan). `POST /api/kpi/disputes` **dihapus** dari rencana API
+>    mobile (§15.4).
+> 4. **Reminder penilaian** (rekan sejawat / bawahan yang belum dinilai) via
+>    push notif **2× sehari** (pagi & sore), bukan tiap jam.
+> 5. **Izin Sakit** — approval atasan pertama tetap wajib baik 1 hari maupun
+>    lebih (sudah sesuai desain awal §16.3, dipertegas); ditambah indikator
+>    lonceng di Home buat atasan kalau ada bawahan yang mengajukan sakit (§16).
 
 ## 1. Arsitektur Sistem & Tech Stack (Kondisi Riil Terpasang)
 
@@ -51,7 +83,7 @@
 | Approve/Reject Cuti + auto-inject kehadiran                                                                                                                                                                                                       | `Web\LeaveRequestController` + `AttendanceService::injectAttendanceForApprovedLeave`               |
 | Profil self-service (foto, ganti password)                                                                                                                                                                                                        | `Web\ProfileController`                                                                            |
 | Dashboard ringkas (hitung pegawai/hadir/telat/cuti)                                                                                                                                                                                               | `Web\DashboardController`                                                                          |
-| Kehadiran (tab admin, baca-saja) — daftar absen per tanggal, badge lokasi (dalam/luar geofence, §8.1.1), status Tepat Waktu/Terlambat (masuk ≤08:00) & Tepat Waktu/Cepat (pulang ≥16:30), filter tanggal/status, sort kolom, page-size 5/10/20/50 | `Web\AttendanceController`, `pages/admin/attendances/index.blade.php`, `Location::containsPoint()` |
+| Kehadiran (tab admin) — daftar absen per tanggal, badge lokasi (dalam/luar geofence, §8.1.1), status Tepat Waktu/Terlambat (masuk ≤08:00) & Tepat Waktu/Cepat (pulang ≥16:30), filter tanggal/status, sort kolom, page-size 5/10/20/50, **tombol Approve/Reject HR (2026-07-16, sudah dibangun)** untuk baris telat/cepat/luar geofence — kolom `Attendance::approval_reason`/`supervisor_approval` (§8.1). | `Web\AttendanceController`, `Livewire\Admin\AttendancesTable`, `pages/admin/attendances/index.blade.php`, `Location::containsPoint()` |
 
 ### Sudah ada schema + model, TAPI belum ada controller/route/view (kosong)
 
@@ -155,20 +187,19 @@ Direktur Utama (job_level 1, root)
 
 Kolom `users.direct_supervisor_id` dan `final_supervisor_id` (skema lama) **dihapus**. Alasan: siapa atasan/penilai seseorang berubah setiap kali struktur berubah (Kasi kosong, jumlah staf berubah, mutasi) — menyimpannya sebagai FK statis membuat data basi begitu ada perubahan yang tidak disertai migrasi data manual.
 
-Sumber kebenaran cukup dua kolom pada `users`: **`department_id`** (posisi di pohon organisasi) dan **`job_level`**. Siapa atasan/penilai seseorang **dihitung on-the-fly** oleh `EvaluatorResolutionService` (baru, lihat §5) setiap kali dibutuhkan (saat membuka form evaluasi, saat approval absen telat, dsb), bukan dibaca dari kolom yang di-freeze saat user dibuat.
+Sumber kebenaran cukup dua kolom pada `users`: **`department_id`** (posisi di pohon organisasi) dan **`job_level`**. Siapa atasan/penilai seseorang **dihitung on-the-fly** oleh `EvaluatorResolutionService` (baru, lihat §5) setiap kali dibutuhkan (saat membuka form evaluasi, saat approval rencana kinerja, dsb), bukan dibaca dari kolom yang di-freeze saat user dibuat. Approval kehadiran **tidak** memakai service ini — itu wewenang HR langsung, lihat §8.1 (update 2026-07-16).
 
 ---
 
 ## 5. Logika Penilai (Evaluator) KPI
 
-Skema 5-bucket total 100 tidak berubah (§7). Komponen **Kinerja Teknis (50%)** dinilai oleh **3 penilai untuk Staf dan Kabag-setara**, tapi **4 penilai khusus untuk Kasi** (ditambah Direktur Utama — lihat §5.2). Bobot per slot **tidak lagi seragam**: 33/33/34 untuk Staf & Kabag-setara, 25/25/25/25 untuk Kasi (§5.4).
+Skema 5-bucket total 100 tidak berubah (§7). Komponen **Kinerja Teknis (50%)** dinilai oleh **3 penilai di semua level** (Staf, Kasi, Kabag-setara — lihat §5.2). Bobot per slot seragam 33/33/34 di ketiga level (§5.4, revert 2026-07-15 — lihat catatan pembuka dokumen).
 
 ### 5.1. Prinsip Umum
 
 - Penilai 1 = atasan langsung satu tingkat di atas (Kasi untuk Staf, Kabag untuk Kasi, Direktur Bidang untuk Kabag-setara).
 - Penilai 2 = atasan tetap di posisi "normal"-nya (Kabag untuk Staf, Direktur Bidang untuk Kasi, Direktur Utama untuk Kabag-setara) — **posisi ini tidak ikut naik** walaupun Penilai 1 sudah diisi orang yang sama karena fallback (mis. Kasi kosong). Tidak ada logika anti-dobel di sini: kalau fallback membuat satu orang mengisi lebih dari satu slot, itu **diperbolehkan** — bobot tiap slot tetap dihitung terpisah, jadi orang itu otomatis mendapat porsi lebih besar.
-- **Khusus Kasi**: ada slot tambahan, Penilai 3 = Direktur Utama (skip-level, seragam untuk semua Kasi apa pun direktoratnya) — jadi baik Direktur Bidang maupun Direktur Utama sama-sama menilai Kasi, persis seperti keduanya sudah sama-sama menilai Kabag-setara. Slot ini tidak berlaku untuk Staf.
-- Penilai terakhir tiap level (Penilai 3 untuk Staf/Kabag-setara, Penilai 4 untuk Kasi) = rekan sejawat, dengan fallback berjenjang kalau rekan tidak ada (lihat per-level di §5.2) dan aturan anti-silang saat rekan tersedia (§5.3).
+- Penilai 3 tiap level (Staf, Kasi, Kabag-setara) = rekan sejawat, dengan fallback berjenjang kalau rekan tidak ada (lihat per-level di §5.2) dan aturan anti-silang saat rekan tersedia (§5.3).
 
 Hanya Staf yang punya kemungkinan atasan langsung kosong (Kasi vakan). Kasi dan Kabag-setara **selalu** punya atasan lengkap (setiap Bagian pasti punya Kabag, setiap Direktorat pasti punya Direktur) — jadi Penilai 1/2 di dua level itu tidak butuh fallback.
 
@@ -181,12 +212,11 @@ Hanya Staf yang punya kemungkinan atasan langsung kosong (Kasi vakan). Kasi dan 
 - Penilai 3 = 1 rekan seksi (§5.3). Tidak ada rekan → diambil alih Kasi (jika ada). Kasi juga kosong → diambil alih Kabag.
 - **Kasus ekstrem**: Kasi kosong **dan** tidak ada rekan seksi → Kabag mengisi ketiga slot sekaligus, penilaian 100% oleh Kabag.
 
-**Kasi / Kepala Seksi (job_level 3) — 4 penilai:**
+**Kasi / Kepala Seksi (job_level 3) — 3 penilai:**
 
 - Penilai 1 = Kabag/Kacab bagian induknya.
 - Penilai 2 = Direktur Bidang (Keuangan/Teknik, sesuai §3.2).
-- Penilai 3 = Direktur Utama (**baru**, §5.1 — skip-level, sama untuk semua Kasi).
-- Penilai 4 = 1 rekan Kasi lain dalam bagian yang sama (untuk Cabang, otomatis selalu pasangan ADM↔Teknik).
+- Penilai 3 = 1 rekan Kasi lain dalam bagian yang sama (untuk Cabang, otomatis selalu pasangan ADM↔Teknik).
 
 **Kabag / Kepala Cabang / Kepala Unit / Staf Ahli (job_level 2):**
 
@@ -206,13 +236,13 @@ Larangan: dalam satu grup, A menilai B **dan** B menilai A pada periode yang sam
 
 ### 5.4. Bobot antar Penilai (dari total 50% Kinerja)
 
-Tidak seragam lagi — Kasi punya 4 slot, Staf & Kabag-setara tetap 3 (§5.1, update 2026-07-14).
+Seragam di semua level — 3 slot per level, 33/33/34 (§5.1, revert 2026-07-15 — sebelumnya sempat 4 slot/25-25-25-25 khusus Kasi per update 2026-07-14, dibatalkan).
 
-| Level        | Penilai 1             | Penilai 2             | Penilai 3                | Penilai 4               |
-| ------------ | --------------------- | --------------------- | ------------------------ | ----------------------- |
-| Staf         | Kasi — 33%            | Kabag — 33%           | Rekan seksi — 34%        | —                       |
-| Kasi         | Kabag — 25%           | Direktur Bidang — 25% | Direktur Utama — 25%     | Rekan sesama Kasi — 25% |
-| Kabag-setara | Direktur Bidang — 33% | Direktur Utama — 33%  | Rekan sesama Kabag — 34% | —                       |
+| Level        | Penilai 1             | Penilai 2             | Penilai 3                |
+| ------------ | --------------------- | --------------------- | ------------------------ |
+| Staf         | Kasi — 33%            | Kabag — 33%           | Rekan seksi — 34%        |
+| Kasi         | Kabag — 33%           | Direktur Bidang — 33% | Rekan sesama Kasi — 34%  |
+| Kabag-setara | Direktur Bidang — 33% | Direktur Utama — 33%  | Rekan sesama Kabag — 34% |
 
 **(2026-07-14, dikonfirmasi)** Bobot di atas disimpan di master table `kpi_evaluator_weights` (job_level, slot, weight), bukan hard-code — HRD bisa ubah tanpa deploy kode. Lihat §10 untuk skema, §13 untuk riwayat keputusan.
 
@@ -274,7 +304,9 @@ Pegawai mulai dari skor penuh di tiap kategori (total 100). Aduan atasan tervali
 
 ### 8.1. Absensi Geofencing
 
-Absen ≤ 08:00 → dianggap tepat waktu. Khusus hari Senin, absen tepat waktu tsb otomatis menandai `is_apel = true` (§7 poin 3) — hari lain tidak relevan untuk apel. Di luar toleransi → wajib isi alasan, status `PENDING` sampai disetujui atasan (dihitung via §5, bukan FK statis).
+Absen ≤ 08:00 → dianggap tepat waktu. Khusus hari Senin, absen tepat waktu tsb otomatis menandai `is_apel = true` (§7 poin 3) — hari lain tidak relevan untuk apel.
+
+**Approval kehadiran (update 2026-07-16):** 3 kondisi butuh approval — telat masuk (>08:00), pulang cepat (<16:30, <12:00 Sabtu), atau clock-in/out di luar geofence. Status `PENDING` sampai **HR** approve/reject dari tombol baru di tab admin Kehadiran (§2) — **bukan** atasan, dan **bukan** dihitung via hierarki §5 (beda dari desain awal yang sempat menyebut "approval absen telat" sebagai contoh pemakaian `EvaluatorResolutionService`, lihat §4). Kolom `supervisor_approval` (sudah ada di skema, §10) tetap dipakai apa adanya untuk PENDING/APPROVED/REJECTED — namanya sedikit menyesatkan sekarang (bukan lagi "supervisor"), tapi rename kolom tidak dianggap perlu, cukup dicatat di sini. `late_reason` tetap wajib diisi pegawai untuk kasus telat; untuk pulang cepat/luar geofence, field alasan yang sama (`late_reason`, dipakai serba-guna) atau kolom alasan baru — **belum diputuskan**, migration `attendances` perlu ditinjau ulang saat Fase D digarap.
 
 #### 8.1.1. Manajemen Kantor (Master Lokasi Geofence)
 
@@ -321,7 +353,7 @@ Input bebas (teks + foto opsional), dibatasi H-2 mundur. Tidak ada alur approval
 | Cabang (selalu 2 Kasi: ADM & Teknik)                 | §5.3 — grup 2 orang → mutual otomatis                                                                                                                       |
 | Spam aduan                                           | Daily capping, §8.4                                                                                                                                         |
 | Baterai GPS                                          | Tracking mati otomatis di luar jam kerja                                                                                                                    |
-| Sanggahan KPI                                        | Dibuka tanggal 1–3, khusus Kasi & Kabag-setara (Staf tidak bisa dispute) — keputusan final ada di evaluator yang skornya disanggah, via `kpi_evaluation_id` |
+| Sanggahan KPI                                        | Dibuka tanggal 1–3, khusus Kasi & Kabag-setara (Staf tidak bisa dispute). **(2026-07-16)** Bukan alur submit formal di app — app cuma menampilkan skor + alasan tiap penilai selama window terbuka; sanggahan sesungguhnya diselesaikan one-on-one dengan atasan langsung/atasan-atasan di luar app. Kalau tidak ada perubahan sampai window ditutup, skor lama dipakai (§15.4) |
 
 ---
 
@@ -367,7 +399,7 @@ Table kpi_evaluations {
   id int [pk, increment]
   kpi_plan_id int [ref: > kpi_plans.id]
   evaluator_id int [ref: > users.id]
-  evaluator_role varchar [note: "ENUM: PENILAI_1, PENILAI_2, PENILAI_3, PENILAI_4 (ganti dari KASI/KABAG/REKAN/KANIT_SOLO — lebih generik krn siapa pengisi tiap tier berbeda per job_level; PENILAI_4 baru dipakai utk slot Direktur Utama pada Kasi, §5)"]
+  evaluator_role varchar [note: "ENUM: PENILAI_1, PENILAI_2, PENILAI_3 (ganti dari KASI/KABAG/REKAN/KANIT_SOLO — lebih generik krn siapa pengisi tiap tier berbeda per job_level, §5)"]
   score int
 }
 
@@ -379,12 +411,13 @@ Table kpi_plans {
 
 Table kpi_evaluator_weights {
   id int [pk, increment]
-  job_level tinyint [note: "3=Kasi, 2=Kabag-setara — Staf (4) juga bisa didata di sini walau saat ini sama dgn Kabag-setara (33/33/34), utk konsistensi satu sumber kebenaran"]
-  slot varchar [note: "ENUM: PENILAI_1, PENILAI_2, PENILAI_3, PENILAI_4 (PENILAI_4 hanya terisi utk job_level 3/Kasi)"]
+  job_level tinyint [note: "4=Staf, 3=Kasi, 2=Kabag-setara — sekarang seragam 33/33/34 di ketiga level, tetap didata per job_level utk satu sumber kebenaran"]
+  slot varchar [note: "ENUM: PENILAI_1, PENILAI_2, PENILAI_3"]
   weight tinyint [note: "dari 50% Kinerja — sum per job_level harus 100 (lalu dikonversi ke bobot 50%), §5.4"]
 
   // BARU (2026-07-14, §13 poin 1) — master table, pola sama dgn kpi_component_weights (§10).
-  // Dibuat karena bobot ini sudah terbukti berubah sekali dalam sesi ini (3→4 penilai Kasi).
+  // Dibuat karena bobot ini sudah terbukti berubah dalam sesi ini (3→4→3 penilai Kasi,
+  // revert 2026-07-15 — lihat catatan pembuka dokumen).
 }
 
 Table kpi_plan_reviews {
@@ -479,7 +512,7 @@ Sesuai rencana awal — belum dimulai. Spesifikasi layar — lihat §14.
 
 ## 13. Pertanyaan Terbuka untuk Konfirmasi (⚠️ ringkasan semua asumsi di atas)
 
-Sudah dikonfirmasi user: bobot 33/33/34 untuk Staf & Kabag-setara (§5.4); Penilai 2 tidak eskalasi saat Kasi kosong, tetap Kabag walau rangkap slot (§5.1–5.2); Apel Pagi (5%) hanya dihitung dari hari Senin (§7 poin 3); Integritas (20%) dipecah 8 sub-kategori skema pengurang (§7.1); "Koperasi" cukup diwakili `instansi = KOPKARTIRDA`, bukan `employment_status` terpisah; `PEGAWAI_80` = status transisi Koperasi → Tirta Daroy dengan gaji 80% (§6.1); `username` field terpisah dari `email`, login menerima email/NIK/username (§6, §10) — sudah diimplementasikan. **(2026-07-14)** Kasi kini 4 penilai (Kabag, Direktur Bidang, Direktur Utama, rekan), bobot rata 25/25/25/25, bukan lagi 3 penilai seragam semua level (§5 revisi). **(2026-07-14)** Besaran pengurangan skor per aduan integritas tervalidasi = **flat per kejadian** sesuai `kpi_integrity_categories.deduction_value` (§10), bukan berjenjang. **(2026-07-14)** Bobot per-slot penilai (§5.4) disimpan di master table `kpi_evaluator_weights`, bukan hard-code (§10). **(2026-07-14)** Status "menunggu approval" pada `kpi_plans` = nilai enum baru `SUBMITTED`, bukan kolom timestamp terpisah (§10). **(2026-07-14)** Komentar approval/revisi (§14.5 sub-tab 4.3) disimpan di tabel riwayat `kpi_plan_reviews` (1 baris per putaran approve/revisi), bukan kolom tunggal (§10). **(2026-07-14)** Live Location "pejabat lihat sesama pejabat" (§14.4) = **seluruh pejabat se-Perumdam**, lintas bagian dan lintas level (job*level 1–3 saling lihat), **bukan** dibatasi satu direktorat seperti asumsi awal — plus switch ke mode "bawahan sendiri saja". **(2026-07-14, ronde 2)** Fase Working/self-assessment (§14.5) **otomatis** ikut penutupan `kpi_periods.status` DRAFT→EVALUATION oleh HRD — tidak ada tombol "ajukan" atau state terpisah per-pegawai; `self_assessment*\*`cukup`PUT`bebas selama periode masih DRAFT dan plan sudah`APPROVED`(§15.4). **(2026-07-14, ronde 2)**`committees`/`committee_members`**dihapus total** dari codebase (migration, model, tabel di DB) — lihat §10. **(2026-07-14, ronde 2)** Dedup harian aduan (§8.4) = **diterima semua, diabaikan diam-diam saat`KpiEvaluationService`menghitung skor** — bukan ditolak saat submit. **(2026-07-14, ronde 2)** Auth mobile = token Sanctum per device, tanpa refresh-token, pola sama dengan`POST /api/login` yang sudah ada. **(2026-07-15, dikonfirmasi eksplisit)** Direktur Utama **tidak pernah approve** rencana kinerja siapa pun, hanya menilai (4.4) — Kasi di-approve Kabag, Kabag di-approve Direktur Bidang, Dirut cuma dapat tab **4.4 Beri Penilaian**, tab **4.3 Approval** tidak muncul untuknya sama sekali.
+Sudah dikonfirmasi user: bobot 33/33/34 untuk Staf & Kabag-setara (§5.4); Penilai 2 tidak eskalasi saat Kasi kosong, tetap Kabag walau rangkap slot (§5.1–5.2); Apel Pagi (5%) hanya dihitung dari hari Senin (§7 poin 3); Integritas (20%) dipecah 8 sub-kategori skema pengurang (§7.1); "Koperasi" cukup diwakili `instansi = KOPKARTIRDA`, bukan `employment_status` terpisah; `PEGAWAI_80` = status transisi Koperasi → Tirta Daroy dengan gaji 80% (§6.1); `username` field terpisah dari `email`, login menerima email/NIK/username (§6, §10) — sudah diimplementasikan. **(2026-07-14)** Kasi sempat diubah jadi 4 penilai (Kabag, Direktur Bidang, Direktur Utama, rekan), bobot rata 25/25/25/25 — **(2026-07-15) dibatalkan**, kembali ke 3 penilai seragam semua level (Kabag, Direktur Bidang, rekan sesama Kasi, 33/33/34, §5 revisi). **(2026-07-14)** Besaran pengurangan skor per aduan integritas tervalidasi = **flat per kejadian** sesuai `kpi_integrity_categories.deduction_value` (§10), bukan berjenjang. **(2026-07-14)** Bobot per-slot penilai (§5.4) disimpan di master table `kpi_evaluator_weights`, bukan hard-code (§10). **(2026-07-14)** Status "menunggu approval" pada `kpi_plans` = nilai enum baru `SUBMITTED`, bukan kolom timestamp terpisah (§10). **(2026-07-14)** Komentar approval/revisi (§14.5 sub-tab 4.3) disimpan di tabel riwayat `kpi_plan_reviews` (1 baris per putaran approve/revisi), bukan kolom tunggal (§10). **(2026-07-14)** Live Location "pejabat lihat sesama pejabat" (§14.4) = **seluruh pejabat se-Perumdam**, lintas bagian dan lintas level (job*level 1–3 saling lihat), **bukan** dibatasi satu direktorat seperti asumsi awal — plus switch ke mode "bawahan sendiri saja". **(2026-07-14, ronde 2)** Fase Working/self-assessment (§14.5) **otomatis** ikut penutupan `kpi_periods.status` DRAFT→EVALUATION oleh HRD — tidak ada tombol "ajukan" atau state terpisah per-pegawai; `self_assessment*\*`cukup`PUT`bebas selama periode masih DRAFT dan plan sudah`APPROVED`(§15.4). **(2026-07-14, ronde 2)**`committees`/`committee_members`**dihapus total** dari codebase (migration, model, tabel di DB) — lihat §10. **(2026-07-14, ronde 2)** Dedup harian aduan (§8.4) = **diterima semua, diabaikan diam-diam saat`KpiEvaluationService`menghitung skor** — bukan ditolak saat submit. **(2026-07-14, ronde 2)** Auth mobile = token Sanctum per device, tanpa refresh-token, pola sama dengan`POST /api/login` yang sudah ada. **(2026-07-15, dikonfirmasi eksplisit)** Direktur Utama **tidak pernah approve** rencana kinerja siapa pun, hanya menilai (4.4) — Kasi di-approve Kabag, Kabag di-approve Direktur Bidang, Dirut cuma dapat tab **4.4 Beri Penilaian**, tab **4.3 Approval** tidak muncul untuknya sama sekali.
 
 Semua poin pertanyaan terbuka §13 sudah selesai dikonfirmasi. Poin serupa untuk fitur **Izin** (Cuti/Sakit/Dinas Luar) — lihat §16.6.
 
@@ -496,7 +529,9 @@ Form: identifier (email/NIK/username) + password — reuse validasi yang sama de
 ### 14.2. Halaman Utama (Home)
 
 - Sapaan dinamis: "Selamat pagi/siang/sore, {nama}" (berdasar jam device).
-- 1 baris peringatan fase KPI periode berjalan (Draft / Draft Approval / Working / Evaluation / Dispute), sesuai posisi user saat ini di alur §14.5.
+- **(2026-07-16, detail lengkap di `docs/mobile-app.md` §2)** Baris status rencana kerja — teks beda sesuai fase periode berjalan: belum buat rencana (warning) → menunggu approval → sudah disetujui; lalu di masa penilaian: belum self-assessment (warning) → menunggu dinilai atasan → sudah dinilai + window sanggah terbuka; terakhir periode ditutup → tampilkan skor akhir.
+- **(2026-07-16)** Baris "Ada {jumlah} rekan kerja perlu dinilai" / "Ada {jumlah} bawahan perlu dinilai" (dua baris terpisah, keduanya link ke sub-tab Beri Penilaian §14.5) — atau teks "sudah menilai semua" kalau habis. Reminder push notif 2×/hari (pagi & sore) selama masih ada yang belum dinilai.
+- **(2026-07-16)** Ikon lonceng kalau ada bawahan yang mengajukan Sakit menunggu approval (§16) — tap → ke sub-tab Sakit-Approval.
 - Skor KPI bulan lalu, ditampilkan **hanya kalau** `kpi_final_scores` periode -1 sudah ada untuk user itu.
 - Tanggal & jam (device clock).
 - Minimap kecil menampilkan posisi user saat ini (reuse Leaflet, sudah ada di `package.json`, §8.1.1).
@@ -510,24 +545,25 @@ List per tanggal: jam masuk/keluar, status Tepat Waktu/Terlambat/Cepat (`Attenda
 ### 14.4. Live Location
 
 - **Staf**: peta hanya menampilkan rekan **satu seksi/departemen yang sama** (`department_id` sama, `job_level = 4`). Tidak bisa melihat pejabat sama sekali.
-- **Pejabat (job_level 1–3 — Kasi, Kabag-setara, Direksi)**: default melihat **seluruh pejabat lain se-Perumdam**, lintas bagian **dan** lintas level — **(dikonfirmasi user 2026-07-14)** Kasi Anggaran bisa lihat Kabag Produksi walau beda bagian dan beda level; pejabat di bawah Direktur Keuangan bisa lihat pejabat di bawah Direktur Teknik. Tidak dibatasi direktorat/level seperti awalnya diasumsikan. Plus **tombol switch** untuk beralih melihat hanya bawahan sendiri (staf dalam satu bagian yang dipimpinnya). Butuh service visibility baru (bukan `EvaluatorResolutionService` — beda scope: siapa boleh **lihat** siapa, bukan siapa **menilai** siapa), lihat §15.7 "Kebutuhan Backend Tambahan".
+- **Pejabat (job_level 1–3 — Kasi, Kabag-setara, Direksi)**: default melihat **seluruh pejabat lain se-Perumdam**, lintas bagian **dan** lintas level — **(dikonfirmasi user 2026-07-14)** Kasi Anggaran bisa lihat Kabag Produksi walau beda bagian dan beda level; pejabat di bawah Direktur Keuangan bisa lihat pejabat di bawah Direktur Teknik. Tidak dibatasi direktorat/level seperti awalnya diasumsikan. Plus **tombol switch** untuk beralih melihat hanya bawahan sendiri — **(2026-07-16)** untuk Kasi, cakupan "bawahan" ini diperluas jadi **seluruh Bagian induknya** (semua Seksi sebagian, bukan cuma Seksi yang dia pimpin sendiri — mis. Kasi Sekretariat bisa lihat staf Seksi Perlengkapan karena keduanya di bawah Bagian Umum). Untuk Kabag cakupan ini otomatis sama saja (dia memang memimpin satu Bagian penuh). Butuh service visibility baru (bukan `EvaluatorResolutionService` — beda scope: siapa boleh **lihat** siapa, bukan siapa **menilai** siapa), lihat §15.7 "Kebutuhan Backend Tambahan".
+- **(2026-07-16, direvisi)** Direksi tidak absen/tidak masuk cakupan KPI, jadi filter mereka disederhanakan jadi 2 (bukan 3): [Pejabat: Kabag-setara & Kasi saja] / [Seluruh Perumdam, dengan sub-filter per Bagian], default = Pejabat. Detail lihat `docs/mobile-app.md` §4.1.
 - Sumber data: `user_current_locations` (1 baris per user, overwrite — §8.3), **bukan riwayat**. Tidak perlu tabel log baru, cukup titik terakhir.
 - Update dari client: tiap 1 menit **atau** tiap pergerakan ≥10 meter, mana yang lebih dulu tercapai (throttle di client, kirim ping saat salah satu syarat terpenuhi). GPS berhenti otomatis di luar jam kerja (>17:00, §8.3).
 - Real-time: idealnya broadcast Reverb per scope (channel private per departemen/level) begitu ping masuk, supaya client tidak polling — belum ada (§1: baru channel default `App.Models.User.{id}`).
 
 ### 14.5. KPI Bulanan
 
-Navigasi sub-tab dari bawah (bottom sheet/segmented, bukan banyak tombol berjejer). Bar fase di atas: **Draft → Draft Approval → Working → Evaluation (status Penilai 1/2/3/4 sudah menilai atau belum) → Dispute → Final**.
+Navigasi sub-tab dari bawah (bottom sheet/segmented, bukan banyak tombol berjejer). Bar fase di atas: **Draft → Draft Approval → Working → Evaluation (status Penilai 1/2/3 sudah menilai atau belum) → Dispute (tampilan saja, §9) → Final**.
 
 | Sub-tab                                 | Isi                                                                                                                                                                                                                                                                                                                                                                | Siapa lihat                                                                                                  |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| 4.1 KPI Bulanan                         | Isi rencana kinerja: target + indikator sukses + bobot (akumulasi ≤ 50, dikunci HRD saat masa pembuatan ditutup). Submit untuk approval.                                                                                                                                                                                                                           | Semua job_level 2–4 (Staf, Kasi, Kabag-setara — §5.2). Direksi **tidak** (out-of-scope KPI bulanan, §5.2).   |
+| 4.1 KPI Bulanan                         | Isi rencana kinerja: target + indikator sukses + bobot (akumulasi ≤ 50, dikunci HRD saat masa pembuatan ditutup). Submit untuk approval. **(2026-07-16)** Kalau atasan minta revisi, komentar atasan muncul menempel di item terkait; kalau plan `SUBMITTED`/`APPROVED`, tab yang sama dipakai lagi untuk **self-assessment** (bukan sub-tab terpisah) — banner teks di atas selama masa Working/Evaluation. Detail alur lihat `docs/mobile-app.md` §5.                                                                                                                                                                                                                        | Semua job_level 2–4 (Staf, Kasi, Kabag-setara — §5.2). Direksi **tidak** (out-of-scope KPI bulanan, §5.2).   |
 | 4.2 KPI Tahunan                         | Sama pola dengan 4.1, tapi **menyusul** — cukup placeholder UI ("segera hadir"), tanpa backend dulu.                                                                                                                                                                                                                                                               | idem, non-Direksi                                                                                            |
 | 4.3 Approval Rencana Kinerja            | List nama yang perlu di-approve/direvisi — **khusus atasan pertama** (Staf→Kasi, Kasi→Kabag, Kabag→Direktur Bidang, §5.1 Penilai 1). Klik nama → detail per item rencana + kolom komentar + tombol Approve/Revisi.                                                                                                                                                 | Kasi, Kabag-setara, Direktur Bidang. **Tidak** untuk Dirut (dia bukan atasan pertama siapa pun, §13 poin 2). |
-| 4.4 Beri Penilaian                      | List nama yang perlu dinilai user ini (dihasilkan dari `EvaluatorResolutionService`, §5), diklik untuk masuk form skor per target rencana kinerja. Kasi: menilai seluruh staf bawahannya + sesama Kasi terpilih (§5.3). Kabag: menilai seluruh bawahan (staf+Kasi) + sesama Kabag terpilih. Direktur Bidang & Dirut: menilai Kabag & Kasi (keduanya, §5.2 revisi). | Semua level yang berperan sebagai penilai di §5, termasuk Dirut & Direktur Bidang.                           |
+| 4.4 Beri Penilaian                      | List nama yang perlu dinilai user ini (dihasilkan dari `EvaluatorResolutionService`, §5), diklik untuk masuk form skor per target rencana kinerja. Kasi: menilai seluruh staf bawahannya + sesama Kasi terpilih (§5.3). Kabag: menilai seluruh bawahan (staf+Kasi) + sesama Kabag terpilih. Direktur Bidang: menilai Kabag & Kasi (keduanya). Dirut: menilai Kabag-setara saja, tidak lagi menilai Kasi (§5.2, revert 2026-07-15). | Semua level yang berperan sebagai penilai di §5, termasuk Dirut & Direktur Bidang.                           |
 | 4.5 Aduan Disiplin Pakaian & Integritas | Cari nama (dropdown searchable), foto (wajib utk Pakaian Dinas), deskripsi, pilih jenis pelanggaran (kategori Integritas dari `kpi_integrity_categories` kalau kategori = Integritas). Integritas terkunci hanya untuk atasan→bawahan (§8.4); Pakaian Dinas terbuka semua pelapor.                                                                                 | Semua, sesuai aturan §8.4.                                                                                   |
 
-**Direksi**: tab KPI hanya menampilkan 4.4 (Direktur Bidang & Dirut menilai Kabag+Kasi) dan 4.3 khusus Direktur Bidang saja (approve rencana Kabag di direktoratnya). 4.1/4.2 disembunyikan total.
+**Direksi**: tab KPI hanya menampilkan 4.4 (Direktur Bidang menilai Kabag+Kasi; Dirut menilai Kabag-setara saja, §5.2) dan 4.3 khusus Direktur Bidang saja (approve rencana Kabag di direktoratnya). 4.1/4.2 disembunyikan total.
 
 ### 14.6. Profil
 
@@ -546,7 +582,7 @@ Base: `routes/api.php`, semua route (kecuali login) di belakang `auth:sanctum`. 
 | `POST /api/login`  | ✅ Sudah ada                   | `{ login, password }` (`login` = email/NIK/username, sama pola §6/§10 web) | `{ token, user }`                                                                                                                                                                                                       | `Api\AuthController`                                             |
 | `POST /api/logout` | ✅ Sudah ada                   | —                                                                          | `{ message }`                                                                                                                                                                                                           |                                                                  |
 | `GET /api/user`    | ✅ Sudah ada (perlu diperkaya) | —                                                                          | Saat ini raw `$request->user()`. Perlu tambah `department`, `jabatan_label`, `photo_url` (reuse `User::jabatanLabel()`/`photoUrl()`, §6/§2 model User sudah punya method-nya) supaya Home & Profil tidak perlu 2x call. |                                                                  |
-| `GET /api/home`    | ⬜ Belum ada                   | —                                                                          | `{ greeting_name, kpi_phase: {period, status, my_step}, last_month_score, attendance_today: {clocked_in, clocked_out} }`                                                                                                | Gabungan ringkas utk §14.2, hindari N call terpisah dari mobile. |
+| `GET /api/home`    | ⬜ Belum ada                   | —                                                                          | `{ greeting_name, kpi_phase: {period, status, my_step}, last_month_score, attendance_today: {clocked_in, clocked_out}, pending_evaluations: {peers, subordinates}, pending_sick_approvals }`                            | **(2026-07-16)** `pending_evaluations`/`pending_sick_approvals` dipakai 2 baris + lonceng baru di Home (§14.2) — gabungan ringkas, hindari N call terpisah dari mobile. |
 
 ### 15.2. Absensi (§14.2, §14.3)
 
@@ -576,12 +612,10 @@ Base: `routes/api.php`, semua route (kecuali login) di belakang `auth:sanctum`. 
 | `PUT /api/kpi/plans/{id}/self-assessment` | ⬜ Belum ada — **baru ditemukan saat review §13**, belum ada di draf awal | `{ self_assessment_score, self_assessment_note, self_assessment_photo? }` | Plan terupdate                                                                                                                                            | Fase **Working** (§14.5): isi setelah plan `APPROVED`, sebelum evaluator mulai menilai. Kolom `self_assessment_photo_path` baru (§10). Mekanisme "diajukan buat dinilai" masih §13 poin terbuka — lihat catatan di bawah. |
 | `GET /api/kpi/approvals/{userId}`         | ⬜ Belum ada                                                              | —                                                                         | Detail plan user tsb (semua item + bobot)                                                                                                                 |                                                                                                                                                                                                                           |
 | `POST /api/kpi/approvals/{userId}`        | ⬜ Belum ada                                                              | `{ action: APPROVED\|REVISION_REQUESTED, comment }`                       | Insert baris baru ke `kpi_plan_reviews` (§10); kalau APPROVED → semua plan user tsb terkunci jadi `APPROVED`; kalau REVISION_REQUESTED → balik ke `DRAFT` | Riwayat semua putaran approve/revisi tersimpan di `kpi_plan_reviews`, bukan ditimpa (§13).                                                                                                                                |
-| `GET /api/kpi/evaluations/pending`        | ⬜ Belum ada                                                              | —                                                                         | List `{ user_id, name, evaluator_role }` yang perlu dinilai user ini                                                                                      | `evaluator_role` = PENILAI_1..4 hasil resolusi §5.                                                                                                                                                                        |
+| `GET /api/kpi/evaluations/pending`        | ⬜ Belum ada                                                              | —                                                                         | List `{ user_id, name, evaluator_role, is_peer }` yang perlu dinilai user ini                                                                             | `evaluator_role` = PENILAI_1..3 hasil resolusi §5. `is_peer` (Penilai 3) dipakai Home §14.2 utk pisah counter rekan vs bawahan.                                                                                           |
 | `GET /api/kpi/evaluations/{userId}`       | ⬜ Belum ada                                                              | —                                                                         | Detail plan + self-assessment user yang mau dinilai                                                                                                       |                                                                                                                                                                                                                           |
 | `POST /api/kpi/evaluations/{userId}`      | ⬜ Belum ada                                                              | `{ scores: [{ kpi_plan_id, score }] }`                                    | Insert `kpi_evaluations` dengan `evaluator_role` sesuai slot penilai user saat ini                                                                        | Anonim untuk Penilai 3 (rekan) — response ke pihak dinilai **tidak** boleh expose `evaluator_id` per skor (§ tugas user: "penilai 3 anonim").                                                                             |
-| `GET /api/kpi/disputes/eligible`          | ⬜ Belum ada                                                              | —                                                                         | `{ can_dispute: bool, window_open_until }`                                                                                                                | Khusus Kasi/Kabag, window tanggal 1–3 (§9).                                                                                                                                                                               |
-| `POST /api/kpi/disputes`                  | ⬜ Belum ada                                                              | `{ kpi_evaluation_id, reason, evidence_file }`                            | `kpi_disputes` baru, status PENDING                                                                                                                       |                                                                                                                                                                                                                           |
-| `GET /api/kpi/final-score?period_id=`     | ⬜ Belum ada                                                              | query `period_id`                                                         | `kpi_final_scores` breakdown 5 bucket + grand total, atau `null` kalau belum dihitung (Fase C)                                                            |                                                                                                                                                                                                                           |
+| `GET /api/kpi/final-score?period_id=`     | ⬜ Belum ada                                                              | query `period_id`                                                         | `kpi_final_scores` breakdown 5 bucket + grand total tiap penilai + alasan, atau `null` kalau belum dihitung (Fase C)                                      | **(2026-07-16)** Dipakai juga sebagai tampilan masa sanggah (§9) — cukup baca skor+alasan di sini, **tidak ada** endpoint submit dispute terpisah (`POST /api/kpi/disputes` dihapus dari rencana, keputusan sanggah diselesaikan di luar app). |
 
 ### 15.5. Aduan (§14.5 sub-tab 4.5, §8.4)
 
@@ -602,11 +636,11 @@ Base: `routes/api.php`, semua route (kecuali login) di belakang `auth:sanctum`. 
 
 1. `EvaluatorResolutionService` (§5, §11) — **belum dibangun**, jadi prasyarat keras untuk approvals, evaluations, dan (parsial) live-location visibility. Skema baca bobot dari `kpi_evaluator_weights` (poin 7), bukan hard-code.
 2. Migrasi: tambah nilai `SUBMITTED` ke `kpi_plans.status` (§10, §13).
-3. Migrasi: `kpi_evaluations.evaluator_role` tambah nilai `PENILAI_4` + migration lama (comment masih `KASI/KABAG/REKAN/KANIT_SOLO`) diselaraskan ke `PENILAI_1..4` (§10).
+3. Migrasi: migration lama `kpi_evaluations.evaluator_role` (comment masih `KASI/KABAG/REKAN/KANIT_SOLO`) diselaraskan ke `PENILAI_1..3` (§10).
 4. Migrasi: tabel baru `kpi_plan_reviews` (§10) — riwayat approve/revisi, dipakai `POST /api/kpi/approvals/{userId}` (§15.4).
 5. `LocationVisibilityService` (baru, terpisah dari `EvaluatorResolutionService`) — Staf: 1 seksi/departemen sama; Pejabat (job_level 1–3): seluruh pejabat se-Perumdam lintas bagian & level, plus mode switch ke bawahan sendiri (§14.4, dikonfirmasi 2026-07-14).
 6. Channel Reverb privat untuk broadcast live location — baru ada default `App.Models.User.{id}` (§1); tanpa ini, live location harus polling. Karena scope "pejabat" sekarang company-wide (bukan per-direktorat), channel broadcast-nya juga perlu 1 channel besar per role (mis. `private-pejabat-locations`) bukan per departemen.
-7. Migrasi: tabel baru `kpi_evaluator_weights` (§10, §13) — dipakai `EvaluatorResolutionService` (poin 1), seed awal sesuai §5.4 (33/33/34 utk Staf & Kabag-setara, 25/25/25/25 utk Kasi).
+7. Migrasi: tabel baru `kpi_evaluator_weights` (§10, §13) — dipakai `EvaluatorResolutionService` (poin 1), seed awal sesuai §5.4 (33/33/34, seragam Staf/Kasi/Kabag-setara).
 
 ---
 
@@ -637,7 +671,8 @@ Cuti selalu berakhir dengan **kertas fisik bertanda tangan** (staf → Kasi → 
 
 - **1 hari** (mendadak): di Profil app, tombol "Ajukan Sakit" → pilih tanggal **hari ini atau besok saja** (tidak bisa pilih tanggal lain) → tidak perlu upload apa-apa → `status=PENDING`, `source=APP`.
 - **>1 hari**: tombol terpisah untuk rentang tanggal → **wajib upload surat dokter** (`attachment_path`) → `status=PENDING`.
-- **Approval**: bukan HR — atasan pertama pegawai (hierarki sama dengan §5.1 Penilai 1: Staf→Kasi, fallback Kabag kalau Kasi kosong; Kasi→Kabag; Kabag→Direktur Bidang; Direksi di luar cakupan, sama seperti KPI §5.2). Atasan lihat notifikasi/list di app-nya sendiri, klik nama → lihat alasan + (kalau >1 hari) foto surat dokter → tekan Approve/Tolak.
+- **Approval**: bukan HR — atasan pertama pegawai (hierarki sama dengan §5.1 Penilai 1: Staf→Kasi, fallback Kabag kalau Kasi kosong; Kasi→Kabag; Kabag→Direktur Bidang; Direksi di luar cakupan, sama seperti KPI §5.2). Wajib untuk **kedua** kasus (1 hari maupun >1 hari) — 1 hari tetap butuh approval walau tanpa surat dokter, supaya tidak disalahgunakan (dikonfirmasi 2026-07-16). Atasan lihat notifikasi/list di app-nya sendiri, klik nama → lihat alasan + (kalau >1 hari) foto surat dokter → tekan Approve/Tolak.
+- **(2026-07-16)** Ikon lonceng di Home (§14.2) menyala kalau atasan punya bawahan dengan pengajuan Sakit `PENDING` — tap → langsung ke sub-tab Sakit-Approval (§16.7). Push notif asli (FCM/APNs) belum diasumsikan tersedia — untuk awal cukup badge count + banner di Home (`pending_sick_approvals`, §15.1), push notif OS menyusul kalau infra-nya sudah disiapkan.
 - **Panel admin HR**: **read-only** — HR cuma lihat daftar semua pengajuan sakit + statusnya (siapa yang approve/tolak), tidak ada tombol aksi (§16.6).
 - Approved → sama seperti Cuti, panggil `injectAttendanceForApprovedLeave` (attendance jadi `SAKIT`).
 

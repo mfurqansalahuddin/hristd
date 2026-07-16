@@ -54,14 +54,7 @@
 
                 <div>
                     <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Pegawai yang Menjabat</label>
-                    <select wire:model="newUserId"
-                        class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
-                        <option value="">- Pilih pegawai -</option>
-                        @foreach ($staff as $employee)
-                            <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->nik }})</option>
-                        @endforeach
-                    </select>
-                    @error('newUserId') <p class="mt-1 text-xs text-error-500">{{ $message }}</p> @enderror
+                    <x-form.person-select name="newUserId" :options="$staff" wire:key="new-jabatan-user-id-picker" />
                     <p class="mt-1.5 text-xs text-gray-400">Jabatan baru cuma bisa dibuat sekaligus dengan pegawai yang menjabatnya — pilih pegawai yang sudah ada.</p>
                 </div>
 
@@ -140,13 +133,8 @@
                             </td>
                             <td class="px-5 py-4 sm:px-6">
                                 <div class="flex items-center gap-2">
-                                    <select wire:model="selected.{{ $department->id }}"
-                                        class="dark:bg-dark-900 shadow-theme-xs w-56 rounded-lg border border-gray-300 bg-transparent px-2 py-1.5 text-xs text-gray-800 dark:border-gray-700 dark:text-white/90">
-                                        <option value="">- Pilih pegawai -</option>
-                                        @foreach ($staff as $employee)
-                                            <option value="{{ $employee->id }}">{{ $employee->name }} ({{ $employee->nik }})</option>
-                                        @endforeach
-                                    </select>
+                                    <x-form.person-select name="selected.{{ $department->id }}" :options="$staff" compact
+                                        nullable class="w-56" wire:key="assign-picker-{{ $department->id }}" />
                                     <button type="button" wire:click="assign({{ $department->id }})"
                                         class="text-sm text-brand-500 hover:underline">
                                         {{ $position['holder'] ? 'Ganti' : 'Tetapkan' }}

@@ -74,6 +74,24 @@ class AttendancesTable extends Component
         $this->dispatch('datepicker-set-date', id: 'attendance-date', date: $this->date);
     }
 
+    /**
+     * Approval kehadiran (telat/pulang cepat/luar geofence) sekarang wewenang
+     * HR sepenuhnya lewat tombol ini — bukan atasan (plan.md §8.1, 2026-07-16).
+     */
+    public function approve(int $attendanceId): void
+    {
+        Attendance::whereKey($attendanceId)->update(['supervisor_approval' => 'APPROVED']);
+
+        session()->flash('success', 'Kehadiran disetujui.');
+    }
+
+    public function reject(int $attendanceId): void
+    {
+        Attendance::whereKey($attendanceId)->update(['supervisor_approval' => 'REJECTED']);
+
+        session()->flash('success', 'Kehadiran ditolak.');
+    }
+
     protected function sortableColumns(): array
     {
         return ['name', 'date', 'clock_in', 'clock_out'];

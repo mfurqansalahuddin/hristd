@@ -45,3 +45,17 @@ function something()
 {
     // ..
 }
+
+/** Pohon organisasi minimal (3 Direksi) dipakai lintas test EvaluatorResolutionService/LocationVisibilityService. */
+function makeOrgTree(): array
+{
+    $dirut = \App\Models\Department::create(['name' => 'Direktur Utama', 'type' => 'DIREKSI']);
+    $dirKeuangan = \App\Models\Department::create(['name' => 'Direktur ADM & Keuangan', 'type' => 'DIREKSI', 'parent_department_id' => $dirut->id, 'directorate' => 'KEUANGAN']);
+    $dirTeknik = \App\Models\Department::create(['name' => 'Direktur Teknik', 'type' => 'DIREKSI', 'parent_department_id' => $dirut->id, 'directorate' => 'TEKNIK']);
+
+    $userDirut = \App\Models\User::factory()->create(['job_level' => 1, 'department_id' => $dirut->id]);
+    $userDirKeuangan = \App\Models\User::factory()->create(['job_level' => 1, 'department_id' => $dirKeuangan->id]);
+    $userDirTeknik = \App\Models\User::factory()->create(['job_level' => 1, 'department_id' => $dirTeknik->id]);
+
+    return compact('dirut', 'dirKeuangan', 'dirTeknik', 'userDirut', 'userDirKeuangan', 'userDirTeknik');
+}

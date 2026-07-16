@@ -15,7 +15,7 @@ class EmployeeController extends Controller
     public function index()
     {
         return view('pages.admin.employees.index', [
-            'title' => 'Master Pegawai',
+            'title' => 'Data Pegawai',
         ]);
     }
 

@@ -6,7 +6,7 @@
 @endphp
 
 @section('content')
-    <x-common.page-breadcrumb :pageTitle="$title" :items="[['label' => 'Master Pegawai', 'url' => route('admin.employees.index')]]" />
+    <x-common.page-breadcrumb :pageTitle="$title" :items="[['label' => 'Data Pegawai', 'url' => route('admin.employees.index')]]" />
 
     <x-common.component-card :title="$title">
         <form method="POST" enctype="multipart/form-data"

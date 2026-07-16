@@ -20,7 +20,7 @@ class Attendance extends Model
     protected $fillable = [
         'user_id', 'date', 'clock_in', 'clock_out',
         'clock_in_lat', 'clock_in_long', 'clock_out_lat', 'clock_out_long',
-        'is_apel', 'status', 'late_reason', 'supervisor_approval',
+        'is_apel', 'status', 'approval_reason', 'supervisor_approval',
     ];
 
     protected $casts = [

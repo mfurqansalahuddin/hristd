@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class ViolationReport extends Model
 {
     protected $fillable = [
-        'reported_user_id', 'reporter_id', 'period_id', 'category',
+        'reported_user_id', 'reporter_id', 'period_id', 'category', 'integrity_category_id',
         'description', 'photo_path', 'incident_date', 'status', 'deduction_point',
     ];
 
@@ -28,5 +28,10 @@ class ViolationReport extends Model
     public function period()
     {
         return $this->belongsTo(KpiPeriod::class, 'period_id');
+    }
+
+    public function integrityCategory()
+    {
+        return $this->belongsTo(KpiIntegrityCategory::class, 'integrity_category_id');
     }
 }
