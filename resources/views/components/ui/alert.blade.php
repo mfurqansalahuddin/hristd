@@ -49,7 +49,13 @@
     $icon = $icons[$variant] ?? $icons['info'];
 @endphp
 
-<div class="rounded-xl border p-4 {{ $containerClass }}">
+<div
+    x-data="{ show: true }"
+    x-init="setTimeout(() => show = false, 4000)"
+    x-show="show"
+    x-transition.duration.300ms
+    class="rounded-xl border p-4 {{ $containerClass }}"
+>
     <div class="flex items-start gap-3">
         <div class="-mt-0.5 {{ $iconClass }}">
             {!! $icon !!}

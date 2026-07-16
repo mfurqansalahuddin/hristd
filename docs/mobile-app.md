@@ -180,13 +180,25 @@ Working → Evaluation → Dispute (tampilan saja, lihat §5.4) → Final**.
 
 **Tampilan & data — masa Draft (isi rencana):**
 
-- State awal kosong: tombol **"+ Tambah Rencana Kerja"** di atas.
-- Tap → form muncul: **Nama Kinerja**, **Target Kinerja**, **Bobot** → Simpan.
+- State awal kosong: tombol **"+ Tambah Rencana Kerja"** di atas, dan
+  **(2026-07-16)** tombol kedua di sampingnya **"Salin dari Bulan Lalu"** —
+  hanya muncul kalau `GET /api/kpi/plans?period_id=<id bulan lalu>` (endpoint
+  yang sama, dipanggil dengan id periode sebelumnya) tidak kosong. Tap →
+  langsung panggil `POST /api/kpi/plans/copy-previous`, tanpa form. Cocok
+  untuk pekerjaan yang targetnya sama tiap bulan (mis. catat meter) — cukup
+  salin lalu edit angkanya kalau perlu.
+- Tap "+ Tambah Rencana Kerja" → form muncul: **Nama Kinerja**, **Target
+  Kinerja**, **Bobot** → Simpan.
 - Item tersimpan tampil sebagai card di list bawah; tap card lagi → form
   yang sama terbuka lagi terisi (mode edit).
 - Di dekat tombol Submit, tampilkan total bobot terpakai (mis. "35/50") —
   dihitung dari list yang sudah di-fetch di client, tidak perlu API
   terpisah.
+- **(2026-07-16)** Kalau ada `task_requests` (lihat API di bawah) untuk
+  periode ini, tampilkan sebagai banner terpisah di atas list — "Instruksi
+  tambahan dari atasan: {comment}". Ini beda dari komentar revisi per-item
+  (§5.3): ini instruksi supaya pegawai **menambahkan item baru**, bukan
+  merevisi item yang sudah ada.
 - Tombol **Submit** → kirim semua item untuk approval (§5.3).
 
 **Tampilan & data — masa Working/Evaluation (self-assessment):**
@@ -205,10 +217,11 @@ periode masuk fase Working/Evaluation:
 | Endpoint                                  | Status | Request                                                                                                                                       | Response                                                                                                                                                                              |
 | ----------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/kpi/periods/current`            | ✅ ada | —                                                                                                                                             | `{ data: { id, month, year, status } \| null }` — dibungkus `data` karena `response()->json(null)` di Laravel/Symfony tidak pernah mengirim body `null` literal (di-coerce jadi `{}`) |
-| `GET /api/kpi/plans?period_id=`           | ✅ ada | query `period_id`                                                                                                                             | `{ data: KpiPlan[] }` milik user (dipakai juga hitung total bobot di client)                                                                                                          |
+| `GET /api/kpi/plans?period_id=`           | ✅ ada | query `period_id`                                                                                                                             | `{ data: KpiPlan[], task_requests: KpiPlanReview[] }` milik user — `task_requests` = instruksi `action=TASK_REQUESTED` (2026-07-16, lihat §5.3) untuk periode ini, dipakai juga hitung total bobot di client |
 | `POST /api/kpi/plans`                     | ✅ ada | `{ period_id, target_description, weight }` — **1 item per call**, ikut alur tambah-satu-per-satu di UI (bukan array batch seperti draf awal) | Item baru, status DRAFT (422 kalau total bobot >50)                                                                                                                                   |
 | `PUT /api/kpi/plans/{id}`                 | ✅ ada | `{ target_description, weight }`                                                                                                              | Item terupdate — hanya kalau status masih DRAFT (403 bukan pemilik, 422 kalau bukan DRAFT/bobot >50)                                                                                  |
 | `POST /api/kpi/plans/submit`              | ✅ ada | `{ period_id }`                                                                                                                               | Semua item `DRAFT` milik user → status `SUBMITTED`                                                                                                                                    |
+| `POST /api/kpi/plans/copy-previous`       | ✅ ada (2026-07-16) | `{ period_id }`                                                                                                                    | Salin `target_description`+`weight` dari plan periode sebelumnya jadi item baru status DRAFT. 422 kalau periode ini sudah punya plan, atau periode lalu tidak ada plan               |
 | `PUT /api/kpi/plans/{id}/self-assessment` | ✅ ada | `{ self_assessment_score, self_assessment_note, self_assessment_photo? }`                                                                     | Item terupdate — isi setelah plan `APPROVED` (422 kalau belum), sebelum evaluator menilai                                                                                             |
 
 ### 5.2 Sub-tab "KPI Tahunan"
@@ -242,11 +255,22 @@ approve/revisi** — bukan per-item. Dua opsi:
 
 Dokumen ini mengasumsikan **opsi 1** kecuali diputuskan lain.
 
-| Endpoint                           | Status | Request                                             | Response                                                                                                                                                |
-| ---------------------------------- | ------ | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/kpi/approvals`           | ✅ ada | —                                                   | `{ data: User[] }` bawahan langsung dengan plan `SUBMITTED` (via `EvaluatorResolutionService`, slot PENILAI_1)                                          |
-| `GET /api/kpi/approvals/{userId}`  | ✅ ada | —                                                   | `{ data: KpiPlan[] }` user tsb (semua item + bobot). 403 kalau caller bukan atasan pertamanya                                                           |
-| `POST /api/kpi/approvals/{userId}` | ✅ ada | `{ action: APPROVED\|REVISION_REQUESTED, comment }` | Insert baris baru `kpi_plan_reviews`; APPROVED → plan terkunci `APPROVED`, REVISION_REQUESTED → balik `DRAFT`. 403 kalau caller bukan atasan pertamanya |
+⚠️ **(2026-07-16)** Selain komentar revisi di atas, atasan pertama juga bisa
+kirim **komentar terpisah** dengan makna beda: "tolong tambahkan 1 item
+rencana kerja baru di luar yang sudah ada" — dipakai untuk kasus ada tugas
+tambahan mendadak di luar rencana awal pegawai. Ini **bukan** revisi item
+yang sudah ada (dipisah dari `comment` di `POST /api/kpi/approvals/{userId}`,
+yang tetap berarti "revisi item ini/rencana ini"), dan **tidak mengubah
+status** `kpi_plans` — murni catatan yang muncul di sisi pegawai sebagai
+`task_requests` (§5.1). Tombol "Minta Tambah Item" di layar detail approval,
+terpisah dari tombol Approve/Revisi, bisa dipakai kapan saja.
+
+| Endpoint                                        | Status              | Request                                             | Response                                                                                                                                                         |
+| ------------------------------------------------ | -------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/kpi/approvals`                        | ✅ ada               | —                                                   | `{ data: User[] }` bawahan langsung dengan plan `SUBMITTED` (via `EvaluatorResolutionService`, slot PENILAI_1)                                                   |
+| `GET /api/kpi/approvals/{userId}`               | ✅ ada               | —                                                   | `{ data: KpiPlan[] }` user tsb (semua item + bobot). 403 kalau caller bukan atasan pertamanya                                                                    |
+| `POST /api/kpi/approvals/{userId}`              | ✅ ada               | `{ action: APPROVED\|REVISION_REQUESTED, comment }` | Insert baris baru `kpi_plan_reviews`; APPROVED → plan terkunci `APPROVED`, REVISION_REQUESTED → balik `DRAFT`. 403 kalau caller bukan atasan pertamanya          |
+| `POST /api/kpi/approvals/{userId}/request-task` | ✅ ada (2026-07-16)  | `{ comment: required }`                             | Insert baris `kpi_plan_reviews` (`action=TASK_REQUESTED`, `kpi_plan_id=null`) — **tidak** mengubah status `kpi_plans`. 403 kalau caller bukan atasan pertamanya |
 
 ### 5.4 Sub-tab "Beri Penilaian" (+ Dispute — tampilan saja)
 
@@ -260,6 +284,15 @@ Dokumen ini mengasumsikan **opsi 1** kecuali diputuskan lain.
   **self-assessment**-nya (kosong kalau belum diisi). Evaluator isi
   **Nilai** + **Alasan** per item → tekan Simpan — **tersimpan otomatis per
   item** saat itu juga (bukan 1 tombol submit di akhir untuk semua item).
+- **(2026-07-16)** Di bawah list item rencana kerja, tampilkan section
+  **"Kriteria Penilaian Tambahan"** — muncul otomatis kalau HR sudah
+  mengaktifkan minimal 1 kriteria di admin (`kpi_extra_criteria`), tanpa
+  perlu konfigurasi tambahan apa pun di sisi mobile. Tiap kriteria tampil
+  sebagai card: **nama** + **deskripsi**, lalu form **Nilai** + **Alasan** →
+  Simpan (tersimpan otomatis per kriteria, sama seperti item rencana kerja).
+  Skor ini ikut dijumlah ke skor akhir bulanan sebagai bucket tambahan di
+  luar 5 bucket tetap (§7 `plan.md`) — kalau HR aktifkan 2 kriteria baru,
+  total bucket yang dijumlah jadi 7.
 - Tombol **Kembali** → balik ke list, bisa pilih nama lain.
 
 Siapa menilai siapa mengikuti 3-penilai per level (lihat
@@ -283,9 +316,10 @@ jadi **tidak ada** tombol/form ajukan-sanggahan di app.
 | Endpoint                              | Status | Request                                                                               | Response                                                                                                                                                                                                                                                                                                                            | Catatan                                                                                                                                                                                                                                                                                              |
 | ------------------------------------- | ------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/kpi/evaluations/pending`    | ✅ ada | —                                                                                     | `{ data: [{ user_id, name, evaluator_role, is_peer, self_assessment_done, already_evaluated }] }` yang perlu dinilai user ini                                                                                                                                                                                                       | `evaluator_role` = PENILAI_1..3. `is_peer` dipakai Home §2.2 utk pisah counter rekan vs bawahan                                                                                                                                                                                                      |
-| `GET /api/kpi/evaluations/{userId}`   | ✅ ada | —                                                                                     | `{ data: KpiPlan[] }` (status APPROVED) user yang mau dinilai. 403 kalau caller bukan salah satu penilainya                                                                                                                                                                                                                         |                                                                                                                                                                                                                                                                                                      |
+| `GET /api/kpi/evaluations/{userId}`   | ✅ ada | —                                                                                     | `{ data: KpiPlan[], extra_criteria: [{id, name, description, score, reason}] }` (status APPROVED) user yang mau dinilai — `extra_criteria` (2026-07-16) = semua kriteria `is_active`, `score`/`reason` sudah terisi kalau evaluator ini sudah pernah menilai. 403 kalau caller bukan salah satu penilainya                                                                                                                                                                                                                         |                                                                                                                                                                                                                                                                                                      |
 | `POST /api/kpi/evaluations/{userId}`  | ✅ ada | `{ kpi_plan_id, score, note }` — **1 item per call**, ikut alur simpan-per-item di UI | Insert/update 1 baris `kpi_evaluations` (unique per plan+evaluator, submit ulang = update)                                                                                                                                                                                                                                          | 403 kalau caller bukan penilainya; `evaluator_role` ditentukan server dari `EvaluatorResolutionService`, bukan dikirim client                                                                                                                                                                        |
-| `GET /api/kpi/final-score?period_id=` | ✅ ada | query `period_id`                                                                     | Selama DRAFT/EVALUATION: `{ progress: [{kpi_plan_id, evaluators_done, evaluators_total}] }` saja (tanpa skor/alasan, `final_score`/`evaluations` null). Setelah `DISPUTE`/`CLOSED`: `{ final_score, evaluations: [{kpi_plan_id, evaluator_role, evaluator_name, score, note}] }` (Penilai 3 `evaluator_name` null, `progress` null) | Server yang menentukan level detail berdasar `kpi_periods.status`, bukan client — supaya skor tidak bocor sebelum waktunya. Dipakai juga sbg tampilan masa sanggah — **tidak ada** endpoint submit dispute terpisah (`POST /api/kpi/disputes`/`GET /api/kpi/disputes/eligible` dihapus dari rencana) |
+| `POST /api/kpi/evaluations/{userId}/criteria` | ✅ ada (2026-07-16) | `{ kpi_extra_criterion_id, score, reason }` — 1 kriteria per call | Insert/update 1 baris `kpi_extra_criteria_scores` (unique per kriteria+user+period+evaluator) | Sama pola otorisasi dengan endpoint di atas |
+| `GET /api/kpi/final-score?period_id=` | ✅ ada | query `period_id`                                                                     | Selama DRAFT/EVALUATION: `{ progress: [{kpi_plan_id, evaluators_done, evaluators_total}] }` saja (tanpa skor/alasan, `final_score`/`evaluations` null). Setelah `DISPUTE`/`CLOSED`: `{ final_score, evaluations: [{kpi_plan_id, evaluator_role, evaluator_name, score, note}], extra_criteria: [{id, name, score}] }` (Penilai 3 `evaluator_name` null, `progress` null) — `extra_criteria` (2026-07-16) breakdown skor kriteria tambahan, ikut aturan visibilitas yang sama | Server yang menentukan level detail berdasar `kpi_periods.status`, bukan client — supaya skor tidak bocor sebelum waktunya. Dipakai juga sbg tampilan masa sanggah — **tidak ada** endpoint submit dispute terpisah (`POST /api/kpi/disputes`/`GET /api/kpi/disputes/eligible` dihapus dari rencana) |
 
 ### 5.5 Sub-tab "Aduan Disiplin Pakaian & Integritas"
 
@@ -397,3 +431,5 @@ Tidak ada endpoint submit DL dari sisi pegawai.
 8. ✅ Approval kehadiran (telat/cepat/luar geofence, §3) — dibangun di web admin (`Livewire\Admin\AttendancesTable::approve/reject`), bukan endpoint mobile.
 9. ⬜ Push notifikasi OS (FCM/APNs) untuk reminder penilaian (§2.2) dan bell sakit (§2.3) — belum diasumsikan tersedia, lihat catatan di §2. `pending_evaluations`/`pending_sick_approvals` di `GET /api/home` sudah tersedia sbg data sumber badge in-app.
 10. ⬜ Migrasi tambahan yang ditemukan saat implementasi (belum di draf awal dokumen ini): `violation_reports.integrity_category_id` (FK ke `kpi_integrity_categories`, wajib utk hitung skor Integritas per kategori) dan `kpi_evaluations.note` (kolom "Alasan" yang didokumentasikan di §5.4 tapi belum ada di migration lama) — **kedua migrasi ini sudah dibuat (2026-07-16)**.
+11. ✅ Migrasi (2026-07-16): tabel `kpi_extra_criteria` (master, admin `/admin/kpi-categories`), `kpi_extra_criteria_scores` (evaluator × kriteria × periode), `kpi_final_score_extras` (breakdown per kriteria di `kpi_final_scores`) — lihat §5.4. `KpiEvaluationService::calculateForUser()` diperluas untuk menjumlahkan skor kriteria aktif ke `grand_total_score`, di luar 5 bucket tetap.
+12. ✅ `kpi_plan_reviews.action` (2026-07-16): nilai baru `TASK_REQUESTED` (kolom sudah `string` polos, tidak perlu migrasi) — dipakai `POST /api/kpi/approvals/{userId}/request-task`, lihat §5.3.

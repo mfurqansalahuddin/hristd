@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Attendance;
 use App\Models\KpiComponentWeight;
 use App\Models\KpiEvaluatorWeight;
+use App\Models\KpiExtraCriterion;
+use App\Models\KpiExtraCriterionScore;
 use App\Models\KpiFinalScore;
 use App\Models\KpiIntegrityCategory;
 use App\Models\KpiPeriod;
@@ -14,9 +16,10 @@ use App\Models\ViolationReport;
 use Carbon\CarbonPeriod;
 
 /**
- * Menghitung kpi_final_scores dari 5 bucket (plan.md §7) saat periode ditutup
- * (Fase C). Dipanggil dari KpiPeriodsTable::updateStatus() saat status ->
- * CLOSED.
+ * Menghitung kpi_final_scores dari 5 bucket tetap (plan.md §7) plus kriteria
+ * penilaian tambahan aktif (`kpi_extra_criteria`, 2026-07-16) saat periode
+ * ditutup (Fase C). Dipanggil dari KpiPeriodsTable::updateStatus() saat
+ * status -> CLOSED.
  *
  * ponytail: dijalankan sinkron per periode (job kecil, ~ratusan pegawai) —
  * pindah ke queued job kalau jumlah pegawai membesar jauh dari skala saat ini.
@@ -50,7 +53,14 @@ class KpiEvaluationService
 
         $grandTotal = $scoreKinerja + $scoreKehadiran + $scoreApel + $scorePakaian + $scoreIntegritas;
 
-        return KpiFinalScore::updateOrCreate(
+        $extraScores = KpiExtraCriterion::where('is_active', true)->get()
+            ->mapWithKeys(fn (KpiExtraCriterion $criterion) => [
+                $criterion->id => $this->extraCriterionScore($user, $period, $criterion),
+            ]);
+
+        $grandTotal += $extraScores->sum();
+
+        $finalScore = KpiFinalScore::updateOrCreate(
             ['user_id' => $user->id, 'period_id' => $period->id],
             [
                 'score_kinerja' => $scoreKinerja,
@@ -61,6 +71,36 @@ class KpiEvaluationService
                 'grand_total_score' => $grandTotal,
             ]
         );
+
+        $finalScore->extras()->delete();
+        foreach ($extraScores as $criterionId => $score) {
+            $finalScore->extras()->create(['kpi_extra_criterion_id' => $criterionId, 'score' => $score]);
+        }
+
+        return $finalScore;
+    }
+
+    /**
+     * Kriteria penilaian tambahan (di luar 5 bucket tetap, §2 catatan 2026-07-16):
+     * rata-rata tertimbang skor evaluator (persis pola kinerjaScore()), lalu
+     * diskalakan ke bobot kriteria itu sendiri.
+     */
+    private function extraCriterionScore(User $user, KpiPeriod $period, KpiExtraCriterion $criterion): float
+    {
+        $evaluatorWeights = KpiEvaluatorWeight::where('job_level', $user->job_level)->pluck('weight', 'slot');
+
+        $scores = KpiExtraCriterionScore::where('kpi_extra_criterion_id', $criterion->id)
+            ->where('user_id', $user->id)
+            ->where('period_id', $period->id)
+            ->get();
+
+        $weightedScore = $scores->sum(function (KpiExtraCriterionScore $score) use ($evaluatorWeights) {
+            $weight = $evaluatorWeights[$score->evaluator_role] ?? 0;
+
+            return $score->score * $weight / 100;
+        });
+
+        return round(min($weightedScore, 100) / 100 * $criterion->weight, 2);
     }
 
     /**

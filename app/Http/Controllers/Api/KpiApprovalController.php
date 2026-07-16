@@ -69,6 +69,29 @@ class KpiApprovalController extends Controller
         return response()->json(['data' => KpiPlan::where('user_id', $user->id)->where('period_id', $period->id)->get()]);
     }
 
+    /**
+     * Instruksi terpisah dari keputusan Approve/Revisi (§13 diskusi 2026-07-16):
+     * atasan pertama minta bawahan menambah 1 item rencana kerja baru di luar
+     * yang sudah ada — tidak mengubah status kpi_plans, murni catatan.
+     */
+    public function requestTask(Request $request, User $user, EvaluatorResolutionService $service)
+    {
+        $period = KpiPeriod::current();
+        $this->authorizeFirstSupervisor($request->user(), $user, $period, $service);
+
+        $data = $request->validate(['comment' => ['required', 'string']]);
+
+        $review = KpiPlanReview::create([
+            'period_id' => $period->id,
+            'user_id' => $user->id,
+            'reviewer_id' => $request->user()->id,
+            'action' => 'TASK_REQUESTED',
+            'comment' => $data['comment'],
+        ]);
+
+        return response()->json($review, 201);
+    }
+
     private function authorizeFirstSupervisor(User $reviewer, User $subject, ?KpiPeriod $period, EvaluatorResolutionService $service): void
     {
         if (! $period) {

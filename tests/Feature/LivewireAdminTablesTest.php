@@ -108,13 +108,16 @@ test('kpi categories panel updates weights and manages integrity categories live
     $originalWeight = $kinerja->weight;
 
     $component = Livewire::actingAs($admin)->test(KpiCategoriesPanel::class)
-        ->set("weights.{$kinerja->id}", $originalWeight + 5)
-        ->call('updateWeights')
-        ->assertHasErrors('weights');
+        ->set("componentEdits.{$kinerja->id}.weight", $originalWeight + 5)
+        ->call('updateComponentWeight', $kinerja->id)
+        ->assertHasNoErrors();
 
-    expect(KpiComponentWeight::find($kinerja->id)->weight)->toBe($originalWeight);
+    // Baris tersimpan meski total belum 100 — supaya rebalance antar baris (satu per satu) tetap bisa dilakukan.
+    expect(KpiComponentWeight::find($kinerja->id)->weight)->toBe($originalWeight + 5);
 
-    $component->set("weights.{$kinerja->id}", $originalWeight)
+    $component->set("componentEdits.{$kinerja->id}.weight", $originalWeight)
+        ->call('updateComponentWeight', $kinerja->id)
+        ->assertHasNoErrors()
         ->call('storeIntegrityCategory')
         ->assertHasErrors(['newName', 'newDeductionValue'])
         ->set('newName', 'Terlambat Apel')

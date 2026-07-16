@@ -3,6 +3,8 @@
 use App\Models\Attendance;
 use App\Models\KpiEvaluation;
 use App\Models\KpiEvaluatorWeight;
+use App\Models\KpiExtraCriterion;
+use App\Models\KpiExtraCriterionScore;
 use App\Models\KpiIntegrityCategory;
 use App\Models\KpiPeriod;
 use App\Models\KpiPlan;
@@ -152,6 +154,28 @@ test('integritas: pengurangan flat per kategori, floor 0 tidak minus', function 
     $categoryMaxTotal = KpiIntegrityCategory::sum('deduction_value'); // 100 (default seed)
     $expected = round((($categoryMaxTotal - 10) / $categoryMaxTotal) * 20, 2); // cuma Etika yg zeroed, floor 0
     expect((float) $final->score_integritas)->toBe($expected);
+});
+
+test('kriteria tambahan aktif ikut dijumlah ke grand_total_score sebagai bucket ekstra', function () {
+    $staf = User::factory()->create(['job_level' => 4]);
+    $criterion = KpiExtraCriterion::create(['name' => 'Kedisiplinan', 'weight' => 10, 'is_active' => true]);
+    KpiExtraCriterion::create(['name' => 'Nonaktif', 'weight' => 5, 'is_active' => false]);
+
+    foreach (['PENILAI_1' => 100, 'PENILAI_2' => 100, 'PENILAI_3' => 100] as $role => $score) {
+        KpiExtraCriterionScore::create([
+            'kpi_extra_criterion_id' => $criterion->id, 'user_id' => $staf->id, 'period_id' => $this->period->id,
+            'evaluator_id' => User::factory()->create()->id, 'evaluator_role' => $role, 'score' => $score,
+        ]);
+    }
+
+    $final = $this->service->calculateForUser($staf, $this->period);
+
+    $expectedGrandTotal = $final->score_kinerja + $final->score_kehadiran + $final->score_apel
+        + $final->score_pakaian + $final->score_integritas + 10.0;
+
+    expect((float) $final->extras()->where('kpi_extra_criterion_id', $criterion->id)->first()->score)->toBe(10.0)
+        ->and((float) $final->grand_total_score)->toBe(round($expectedGrandTotal, 2))
+        ->and($final->extras()->count())->toBe(1); // kriteria nonaktif tidak ikut disimpan
 });
 
 test('calculateForPeriod hanya menghitung job_level 2-4, Direksi di luar cakupan', function () {

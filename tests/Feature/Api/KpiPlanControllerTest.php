@@ -2,6 +2,7 @@
 
 use App\Models\KpiPeriod;
 use App\Models\KpiPlan;
+use App\Models\KpiPlanReview;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -70,4 +71,52 @@ test('self-assessment hanya bisa diisi kalau rencana sudah APPROVED', function (
     ])->assertOk();
 
     expect($plan->fresh()->self_assessment_score)->toBe(90);
+});
+
+test('salin rencana kerja dari bulan lalu menduplikasi target_description dan weight, status fresh DRAFT', function () {
+    $periodLalu = KpiPeriod::create(['month' => 6, 'year' => 2026, 'status' => 'CLOSED']);
+    $periodIni = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'DRAFT']);
+    $staf = User::factory()->create(['job_level' => 4]);
+    KpiPlan::create(['user_id' => $staf->id, 'period_id' => $periodLalu->id, 'target_description' => 'Catat meter', 'weight' => 30, 'status' => 'APPROVED', 'self_assessment_score' => 90]);
+
+    $this->actingAs($staf, 'sanctum')->postJson('/api/kpi/plans/copy-previous', ['period_id' => $periodIni->id])->assertCreated();
+
+    $copied = KpiPlan::where('user_id', $staf->id)->where('period_id', $periodIni->id)->first();
+    expect($copied->target_description)->toBe('Catat meter')
+        ->and((float) $copied->weight)->toBe(30.0)
+        ->and($copied->status)->toBe('DRAFT')
+        ->and($copied->self_assessment_score)->toBeNull();
+});
+
+test('salin rencana kerja ditolak kalau periode ini sudah punya rencana', function () {
+    $periodLalu = KpiPeriod::create(['month' => 6, 'year' => 2026, 'status' => 'CLOSED']);
+    $periodIni = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'DRAFT']);
+    $staf = User::factory()->create(['job_level' => 4]);
+    KpiPlan::create(['user_id' => $staf->id, 'period_id' => $periodLalu->id, 'target_description' => 'Catat meter', 'weight' => 30, 'status' => 'APPROVED']);
+    KpiPlan::create(['user_id' => $staf->id, 'period_id' => $periodIni->id, 'target_description' => 'Sudah ada', 'weight' => 10, 'status' => 'DRAFT']);
+
+    $this->actingAs($staf, 'sanctum')->postJson('/api/kpi/plans/copy-previous', ['period_id' => $periodIni->id])
+        ->assertStatus(422)->assertJsonValidationErrors('period_id');
+});
+
+test('salin rencana kerja ditolak kalau tidak ada rencana bulan lalu', function () {
+    $periodIni = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'DRAFT']);
+    $staf = User::factory()->create(['job_level' => 4]);
+
+    $this->actingAs($staf, 'sanctum')->postJson('/api/kpi/plans/copy-previous', ['period_id' => $periodIni->id])
+        ->assertStatus(422)->assertJsonValidationErrors('period_id');
+});
+
+test('GET kpi/plans menyertakan task_requests dari atasan', function () {
+    $period = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'DRAFT']);
+    $staf = User::factory()->create(['job_level' => 4]);
+    $atasan = User::factory()->create(['job_level' => 3]);
+    KpiPlanReview::create([
+        'period_id' => $period->id, 'user_id' => $staf->id, 'reviewer_id' => $atasan->id,
+        'action' => 'TASK_REQUESTED', 'comment' => 'Tambahkan target baru',
+    ]);
+
+    $response = $this->actingAs($staf, 'sanctum')->getJson("/api/kpi/plans?period_id={$period->id}")->assertOk();
+
+    expect($response->json('task_requests.0.comment'))->toBe('Tambahkan target baru');
 });

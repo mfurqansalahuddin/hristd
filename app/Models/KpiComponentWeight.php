@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class KpiComponentWeight extends Model
 {
-    protected $fillable = ['component', 'weight'];
+    protected $fillable = ['component', 'weight', 'description'];
 
     public const LABELS = [
         'KINERJA' => 'Kinerja Teknis',

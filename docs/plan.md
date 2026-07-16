@@ -455,6 +455,14 @@ Tabel lain (`user_current_locations`, `kpi_periods`, `violation_reports`, `kpi_d
 
 Selain itu ada 2 tabel baru di luar skema V3.0 awal, untuk fitur Master Kategori KPI (§2): `kpi_component_weights` (5 baris tetap — Kinerja/Kehadiran/Apel/Pakaian Dinas/Integritas, tiap baris `component` + `weight`, sum harus 100) dan `kpi_integrity_categories` (master data bebas tambah/hapus — `name` + `deduction_value`, seed awal 8 kategori §7.1). Ditambah 2 tabel baru lagi hasil keputusan §13 (2026-07-14): `kpi_evaluator_weights` dan `kpi_plan_reviews` (lihat blok skema di atas).
 
+**(2026-07-16)** 3 tabel baru lagi — kriteria penilaian bebas yang bobotnya ikut dijumlah ke total 100% bersama `kpi_component_weights` (bukan fitur laporan terpisah, lihat `docs/mobile-app.md` §5.4/§8):
+
+- `kpi_extra_criteria`: `name`, `description` (nullable), `weight`, `is_active` — master data admin, pola sama dengan `kpi_integrity_categories`.
+- `kpi_extra_criteria_scores`: `kpi_extra_criterion_id`, `user_id`, `period_id`, `evaluator_id`, `evaluator_role`, `score`, `reason` (nullable) — pola sama persis `kpi_evaluations`, tapi keyed per kriteria bukan per `kpi_plan_id`.
+- `kpi_final_score_extras`: `kpi_final_score_id`, `kpi_extra_criterion_id`, `score` — breakdown per kriteria, karena kolom tetap di `kpi_final_scores` tidak bisa menampung jumlah kriteria yang dinamis.
+
+`kpi_plan_reviews.action` juga dapat nilai baru `TASK_REQUESTED` (2026-07-16, kolom tetap `string` polos, tidak perlu migrasi) — instruksi atasan pertama minta bawahan menambah 1 item rencana kerja baru, terpisah dari komentar revisi item yang sudah ada; tidak mengubah status `kpi_plans`.
+
 ---
 
 ## 11. Struktur Folder (Kondisi Riil + Tambahan yang Direncanakan)

@@ -37,7 +37,13 @@ class KpiFinalScoreController extends Controller
             ]);
         }
 
-        $finalScore = KpiFinalScore::where('user_id', $user->id)->where('period_id', $period->id)->first();
+        $finalScore = KpiFinalScore::with('extras.criterion')->where('user_id', $user->id)->where('period_id', $period->id)->first();
+
+        $extraCriteria = $finalScore?->extras->map(fn ($extra) => [
+            'id' => $extra->kpi_extra_criterion_id,
+            'name' => $extra->criterion->name,
+            'score' => $extra->score,
+        ]) ?? [];
 
         $evaluations = KpiEvaluation::with('evaluator')
             ->whereIn('kpi_plan_id', $plans->pluck('id'))
@@ -54,6 +60,7 @@ class KpiFinalScoreController extends Controller
         return response()->json([
             'final_score' => $finalScore,
             'evaluations' => $evaluations,
+            'extra_criteria' => $extraCriteria,
         ]);
     }
 }

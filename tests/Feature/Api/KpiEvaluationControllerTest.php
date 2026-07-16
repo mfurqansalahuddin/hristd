@@ -3,6 +3,8 @@
 use App\Models\Department;
 use App\Models\KpiEvaluation;
 use App\Models\KpiEvaluatorWeight;
+use App\Models\KpiExtraCriterion;
+use App\Models\KpiExtraCriterionScore;
 use App\Models\KpiPeriod;
 use App\Models\KpiPlan;
 use App\Models\User;
@@ -74,4 +76,37 @@ test('pending menampilkan is_peer sesuai slot dan status sudah/belum dinilai', f
     expect($entry['evaluator_role'])->toBe('PENILAI_1')
         ->and($entry['is_peer'])->toBeFalse()
         ->and($entry['already_evaluated'])->toBeFalse();
+});
+
+test('kriteria penilaian tambahan bisa diisi skor+alasan oleh penilai', function () {
+    $period = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'EVALUATION']);
+    $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN']);
+    $seksi = Department::create(['name' => 'Seksi A', 'type' => 'SEKSI', 'parent_department_id' => $bagian->id]);
+    $kasi = User::factory()->create(['job_level' => 3, 'department_id' => $seksi->id]);
+    $staf = User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id]);
+    $criterion = KpiExtraCriterion::create(['name' => 'Kedisiplinan', 'description' => 'Tepat waktu rapat', 'weight' => 10, 'is_active' => true]);
+
+    $this->actingAs($kasi, 'sanctum')->postJson("/api/kpi/evaluations/{$staf->id}/criteria", [
+        'kpi_extra_criterion_id' => $criterion->id, 'score' => 80, 'reason' => 'Cukup baik',
+    ])->assertOk();
+
+    $score = KpiExtraCriterionScore::where('kpi_extra_criterion_id', $criterion->id)->where('evaluator_id', $kasi->id)->first();
+    expect($score->evaluator_role)->toBe('PENILAI_1')->and($score->score)->toBe(80);
+
+    $response = $this->actingAs($kasi, 'sanctum')->getJson("/api/kpi/evaluations/{$staf->id}")->assertOk();
+    $entry = collect($response->json('extra_criteria'))->firstWhere('id', $criterion->id);
+    expect($entry['score'])->toBe(80)->and($entry['reason'])->toBe('Cukup baik');
+});
+
+test('kriteria tambahan yang tidak aktif tidak muncul di form penilaian', function () {
+    $period = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'EVALUATION']);
+    $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN']);
+    $seksi = Department::create(['name' => 'Seksi A', 'type' => 'SEKSI', 'parent_department_id' => $bagian->id]);
+    $kasi = User::factory()->create(['job_level' => 3, 'department_id' => $seksi->id]);
+    $staf = User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id]);
+    $criterion = KpiExtraCriterion::create(['name' => 'Nonaktif', 'weight' => 10, 'is_active' => false]);
+
+    $response = $this->actingAs($kasi, 'sanctum')->getJson("/api/kpi/evaluations/{$staf->id}")->assertOk();
+
+    expect(collect($response->json('extra_criteria'))->pluck('id'))->not->toContain($criterion->id);
 });

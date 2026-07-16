@@ -37,15 +37,18 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/kpi/plans', [KpiPlanController::class, 'store']);
     Route::put('/kpi/plans/{plan}', [KpiPlanController::class, 'update']);
     Route::post('/kpi/plans/submit', [KpiPlanController::class, 'submit']);
+    Route::post('/kpi/plans/copy-previous', [KpiPlanController::class, 'copyPrevious']);
     Route::put('/kpi/plans/{plan}/self-assessment', [KpiPlanController::class, 'selfAssessment']);
 
     Route::get('/kpi/approvals', [KpiApprovalController::class, 'index']);
     Route::get('/kpi/approvals/{user}', [KpiApprovalController::class, 'show']);
     Route::post('/kpi/approvals/{user}', [KpiApprovalController::class, 'store']);
+    Route::post('/kpi/approvals/{user}/request-task', [KpiApprovalController::class, 'requestTask']);
 
     Route::get('/kpi/evaluations/pending', [KpiEvaluationController::class, 'pending']);
     Route::get('/kpi/evaluations/{user}', [KpiEvaluationController::class, 'show']);
     Route::post('/kpi/evaluations/{user}', [KpiEvaluationController::class, 'store']);
+    Route::post('/kpi/evaluations/{user}/criteria', [KpiEvaluationController::class, 'storeCriteriaScore']);
 
     Route::get('/kpi/final-score', [KpiFinalScoreController::class, 'show']);
 

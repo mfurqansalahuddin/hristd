@@ -20,4 +20,9 @@ class KpiFinalScore extends Model
     {
         return $this->belongsTo(KpiPeriod::class, 'period_id');
     }
+
+    public function extras()
+    {
+        return $this->hasMany(KpiFinalScoreExtra::class);
+    }
 }

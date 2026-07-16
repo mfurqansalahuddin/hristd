@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\KpiPeriod;
 use App\Models\KpiPlan;
+use App\Models\KpiPlanReview;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -19,7 +21,13 @@ class KpiPlanController extends Controller
 
         $plans = KpiPlan::where('user_id', $request->user()->id)->where('period_id', $data['period_id'])->get();
 
-        return response()->json(['data' => $plans]);
+        $taskRequests = KpiPlanReview::where('user_id', $request->user()->id)
+            ->where('period_id', $data['period_id'])
+            ->where('action', 'TASK_REQUESTED')
+            ->latest()
+            ->get();
+
+        return response()->json(['data' => $plans, 'task_requests' => $taskRequests]);
     }
 
     public function store(Request $request)
@@ -110,5 +118,41 @@ class KpiPlanController extends Controller
         $plan->update($data);
 
         return response()->json($plan->fresh());
+    }
+
+    /**
+     * Salin target_description+weight dari periode sebelumnya (§13 diskusi
+     * 2026-07-16) — untuk pekerjaan yang polanya sama tiap bulan (mis. catat
+     * meter), supaya tidak input ulang dari nol. Status selalu fresh DRAFT,
+     * self-assessment tidak ikut disalin.
+     */
+    public function copyPrevious(Request $request)
+    {
+        $data = $request->validate(['period_id' => ['required', 'integer', 'exists:kpi_periods,id']]);
+
+        $user = $request->user();
+        $period = KpiPeriod::findOrFail($data['period_id']);
+
+        if (KpiPlan::where('user_id', $user->id)->where('period_id', $period->id)->exists()) {
+            throw ValidationException::withMessages(['period_id' => ['Sudah ada rencana kerja periode ini, tidak bisa disalin.']]);
+        }
+
+        $previousPlans = $period->previous()
+            ? KpiPlan::where('user_id', $user->id)->where('period_id', $period->previous()->id)->get()
+            : collect();
+
+        if ($previousPlans->isEmpty()) {
+            throw ValidationException::withMessages(['period_id' => ['Tidak ada rencana kerja bulan lalu untuk disalin.']]);
+        }
+
+        $previousPlans->each(fn (KpiPlan $previous) => KpiPlan::create([
+            'user_id' => $user->id,
+            'period_id' => $period->id,
+            'target_description' => $previous->target_description,
+            'weight' => $previous->weight,
+            'status' => 'DRAFT',
+        ]));
+
+        return response()->json(['data' => KpiPlan::where('user_id', $user->id)->where('period_id', $period->id)->get()], 201);
     }
 }
