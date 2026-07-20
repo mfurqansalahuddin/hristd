@@ -25,6 +25,31 @@ test('clock-in tepat waktu di dalam geofence langsung approved, tidak wajib alas
         ->and($attendance->is_apel)->toBeTrue(); // Senin & tepat waktu
 });
 
+test('clock-in dengan GPS palsu diblokir total, tidak tercatat', function () {
+    $office = Location::create(['name' => 'Kantor Pusat', 'type' => 'RADIUS', 'lat' => 5.5480, 'long' => 95.3238, 'radius_meters' => 100]);
+    $user = User::factory()->create(['job_level' => 4]);
+    Carbon::setTestNow(Carbon::create(2026, 7, 13, 7, 45)); // Senin, tepat waktu & di dalam geofence
+
+    $this->actingAs($user, 'sanctum')->postJson('/api/attendance/clock-in', [
+        'lat' => (float) $office->lat, 'long' => (float) $office->long, 'mocked' => true,
+    ])->assertStatus(422)->assertJsonValidationErrors('mocked');
+
+    expect(Attendance::where('user_id', $user->id)->exists())->toBeFalse();
+});
+
+test('clock-out dengan GPS palsu diblokir total', function () {
+    $office = Location::create(['name' => 'Kantor Pusat', 'type' => 'RADIUS', 'lat' => -6.2, 'long' => 106.8, 'radius_meters' => 100]);
+    $user = User::factory()->create(['job_level' => 4]);
+    Carbon::setTestNow(Carbon::create(2026, 7, 14, 7, 45));
+    $coords = ['lat' => (float) $office->lat, 'long' => (float) $office->long];
+    $this->actingAs($user, 'sanctum')->postJson('/api/attendance/clock-in', $coords)->assertOk();
+
+    $this->actingAs($user, 'sanctum')->postJson('/api/attendance/clock-out', [...$coords, 'mocked' => true])
+        ->assertStatus(422)->assertJsonValidationErrors('mocked');
+
+    expect(Attendance::where('user_id', $user->id)->first()->clock_out)->toBeNull();
+});
+
 test('clock-in telat wajib approval_reason, status PENDING menunggu HR', function () {
     $user = User::factory()->create(['job_level' => 4]);
     Carbon::setTestNow(Carbon::create(2026, 7, 14, 8, 30)); // Selasa, telat

@@ -7,13 +7,16 @@ use Illuminate\Database\Eloquent\Model;
 class UserCurrentLocation extends Model
 {
     protected $primaryKey = 'user_id';
+
     public $incrementing = false;
+
     public $timestamps = false;
 
-    protected $fillable = ['user_id', 'lat', 'long', 'last_updated_at'];
+    protected $fillable = ['user_id', 'lat', 'long', 'last_updated_at', 'is_mock_location'];
 
     protected $casts = [
         'last_updated_at' => 'datetime',
+        'is_mock_location' => 'boolean',
     ];
 
     public function user()

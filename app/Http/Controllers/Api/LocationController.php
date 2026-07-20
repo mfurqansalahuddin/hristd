@@ -32,6 +32,7 @@ class LocationController extends Controller
         $data = $request->validate([
             'lat' => ['required', 'numeric'],
             'long' => ['required', 'numeric'],
+            'mocked' => ['nullable', 'boolean'],
         ]);
 
         // GPS berhenti otomatis di luar jam kerja (>17:00, §8.3 plan.md) — server no-op,
@@ -41,13 +42,14 @@ class LocationController extends Controller
         }
 
         $now = now();
+        $mocked = $data['mocked'] ?? false;
 
         UserCurrentLocation::updateOrCreate(
             ['user_id' => $request->user()->id],
-            ['lat' => $data['lat'], 'long' => $data['long'], 'last_updated_at' => $now]
+            ['lat' => $data['lat'], 'long' => $data['long'], 'last_updated_at' => $now, 'is_mock_location' => $mocked]
         );
 
-        broadcast(new LocationPinged($request->user(), $data['lat'], $data['long'], $now->toIso8601String()));
+        broadcast(new LocationPinged($request->user(), $data['lat'], $data['long'], $now->toIso8601String(), $mocked));
 
         return response()->json(['ok' => true]);
     }
@@ -84,6 +86,7 @@ class LocationController extends Controller
                 'long' => (float) $location->long,
                 'last_updated_at' => $location->last_updated_at,
                 'is_online' => $location->last_updated_at->gt(now()->subMinutes(3)),
+                'is_mock_location' => (bool) $location->is_mock_location,
             ]);
 
         return response()->json(['data' => $colleagues]);

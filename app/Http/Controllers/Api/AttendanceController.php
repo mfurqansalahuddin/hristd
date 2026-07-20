@@ -19,7 +19,12 @@ class AttendanceController extends Controller
             'lat' => ['required', 'numeric'],
             'long' => ['required', 'numeric'],
             'approval_reason' => ['nullable', 'string'],
+            'mocked' => ['nullable', 'boolean'],
         ]);
+
+        if ($data['mocked'] ?? false) {
+            throw ValidationException::withMessages(['mocked' => ['Terdeteksi lokasi GPS palsu, absen ditolak.']]);
+        }
 
         $user = $request->user();
         $today = now()->toDateString();
@@ -63,7 +68,12 @@ class AttendanceController extends Controller
             'lat' => ['required', 'numeric'],
             'long' => ['required', 'numeric'],
             'approval_reason' => ['nullable', 'string'],
+            'mocked' => ['nullable', 'boolean'],
         ]);
+
+        if ($data['mocked'] ?? false) {
+            throw ValidationException::withMessages(['mocked' => ['Terdeteksi lokasi GPS palsu, absen ditolak.']]);
+        }
 
         $user = $request->user();
         $today = now()->toDateString();

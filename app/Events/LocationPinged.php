@@ -24,6 +24,7 @@ class LocationPinged implements ShouldBroadcast
         public float $lat,
         public float $long,
         public string $lastUpdatedAt,
+        public bool $mocked = false,
     ) {}
 
     /**
@@ -60,6 +61,7 @@ class LocationPinged implements ShouldBroadcast
             'long' => $this->long,
             'last_updated_at' => $this->lastUpdatedAt,
             'is_online' => true,
+            'is_mock_location' => $this->mocked,
         ];
     }
 }

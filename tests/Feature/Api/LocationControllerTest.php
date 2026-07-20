@@ -25,6 +25,21 @@ test('ping upsert lokasi terkini di dalam jam kerja', function () {
     Event::assertDispatched(LocationPinged::class, fn (LocationPinged $event) => $event->user->is($user));
 });
 
+test('ping dengan mocked=true tersimpan dan tampil di colleagues', function () {
+    Event::fake([LocationPinged::class]);
+    $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN']);
+    $kasi1 = User::factory()->create(['job_level' => 3, 'department_id' => $bagian->id]);
+    $kasi2 = User::factory()->create(['job_level' => 3, 'department_id' => $bagian->id]);
+    Carbon::setTestNow(Carbon::create(2026, 7, 14, 10, 0));
+
+    $this->actingAs($kasi2, 'sanctum')->postJson('/api/location/ping', ['lat' => 5.5, 'long' => 95.3, 'mocked' => true])->assertOk();
+
+    expect(UserCurrentLocation::where('user_id', $kasi2->id)->first()->is_mock_location)->toBeTrue();
+
+    $response = $this->actingAs($kasi1, 'sanctum')->getJson('/api/location/colleagues')->assertOk();
+    expect($response->json('data.0.is_mock_location'))->toBeTrue();
+});
+
 test('ping no-op di luar jam kerja (>17:00)', function () {
     Event::fake([LocationPinged::class]);
     $user = User::factory()->create();

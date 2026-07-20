@@ -23,13 +23,13 @@ class LocationVisibilityService
         }
 
         if ((int) $user->job_level === 1) {
-            return $this->direksiScope($levelFilter, $departmentFilter);
+            return $this->direksiScope($user, $levelFilter, $departmentFilter);
         }
 
         // Kasi (3) & Kabag-setara (2).
         return $scope === 'subordinates'
             ? $this->subordinatesOf($user)
-            : $this->pejabatCompanyWide($user->id);
+            : $this->pejabatCompanyWide();
     }
 
     /** Otorisasi channel Reverb `pejabat-locations` (§15.7 poin 6): sama seperti peers pejabat. */
@@ -52,21 +52,18 @@ class LocationVisibilityService
         return in_array($departmentId, $this->subordinateDepartmentIdsFor($user), true);
     }
 
-    /** Staf: hanya rekan 1 seksi/departemen yang sama (§4). */
+    /** Staf: rekan 1 seksi/departemen yang sama, termasuk diri sendiri (§4 — staf cuma punya 1 map). */
     private function staffPeers(User $staf): Collection
     {
         return User::where('department_id', $staf->department_id)
             ->where('job_level', 4)
-            ->where('id', '!=', $staf->id)
             ->pluck('id');
     }
 
-    /** Peers default utk pejabat (job_level 2-3): seluruh pejabat se-Perumdam, lintas bagian & level. */
-    private function pejabatCompanyWide(int $excludeUserId): Collection
+    /** Peers default utk pejabat (job_level 2-3): seluruh pejabat se-Perumdam, termasuk diri sendiri. */
+    private function pejabatCompanyWide(): Collection
     {
-        return User::whereIn('job_level', [1, 2, 3])
-            ->where('id', '!=', $excludeUserId)
-            ->pluck('id');
+        return User::whereIn('job_level', [1, 2, 3])->pluck('id');
     }
 
     /**
@@ -110,12 +107,13 @@ class LocationVisibilityService
     /**
      * Filter khusus Direksi (§4.1 mobile-app.md, direvisi 2026-07-16): Direksi
      * tidak absen/tidak masuk cakupan KPI, jadi cukup 2 filter — tidak ada
-     * mode "peers" default seperti level lain.
+     * mode "peers" default seperti level lain. Direksi tidak pernah melihat
+     * lokasinya sendiri di kedua filter, cuma pejabat & staf.
      */
-    private function direksiScope(?string $levelFilter, ?int $departmentFilter): Collection
+    private function direksiScope(User $direksi, ?string $levelFilter, ?int $departmentFilter): Collection
     {
         if ($levelFilter === 'everyone') {
-            $query = User::whereIn('job_level', [1, 2, 3, 4]);
+            $query = User::whereIn('job_level', [1, 2, 3, 4])->where('id', '!=', $direksi->id);
 
             if ($departmentFilter && $bagian = Department::find($departmentFilter)) {
                 $query->whereIn('department_id', [$bagian->id, ...$this->staffDepartmentIdsUnder($bagian)]);

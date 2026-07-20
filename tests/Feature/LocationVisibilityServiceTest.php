@@ -11,7 +11,7 @@ beforeEach(function () {
     $this->service = new LocationVisibilityService;
 });
 
-test('staf hanya lihat rekan 1 seksi yang sama, tidak lihat pejabat', function () {
+test('staf lihat diri sendiri & rekan 1 seksi yang sama, tidak lihat pejabat', function () {
     $org = makeOrgTree();
     $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN', 'parent_department_id' => $org['dirKeuangan']->id]);
     $seksiA = Department::create(['name' => 'Seksi A', 'type' => 'SEKSI', 'parent_department_id' => $bagian->id]);
@@ -25,12 +25,12 @@ test('staf hanya lihat rekan 1 seksi yang sama, tidak lihat pejabat', function (
     $visible = $this->service->visibleUserIdsFor($staf);
 
     expect($visible)->toContain($rekanSeksi->id)
+        ->toContain($staf->id) // staf cuma punya 1 map — lokasinya sendiri ikut tampil
         ->not->toContain($stafSeksiLain->id)
-        ->not->toContain($kasi->id)
-        ->not->toContain($staf->id);
+        ->not->toContain($kasi->id);
 });
 
-test('kasi default lihat seluruh pejabat se-perumdam lintas bagian & level', function () {
+test('kasi default lihat diri sendiri & seluruh pejabat se-perumdam lintas bagian & level', function () {
     $org = makeOrgTree();
     $bagianA = Department::create(['name' => 'Bagian A', 'type' => 'BAGIAN', 'parent_department_id' => $org['dirKeuangan']->id]);
     $bagianB = Department::create(['name' => 'Bagian B', 'type' => 'BAGIAN', 'parent_department_id' => $org['dirTeknik']->id]);
@@ -43,7 +43,7 @@ test('kasi default lihat seluruh pejabat se-perumdam lintas bagian & level', fun
 
     expect($visible)->toContain($kabagB->id)
         ->toContain($org['userDirut']->id)
-        ->not->toContain($kasiA->id);
+        ->toContain($kasiA->id); // pejabat lihat dirinya sendiri di tab "Pejabat"
 });
 
 test('kasi switch bawahan diperluas ke 1 bagian penuh, bukan cuma seksinya sendiri', function () {
@@ -115,5 +115,7 @@ test('direksi filter seluruh perumdam + sub-filter per bagian termasuk staf', fu
 
     $visible = $this->service->visibleUserIdsFor($org['userDirut'], levelFilter: 'everyone', departmentFilter: $bagianTarget->id);
 
-    expect($visible)->toContain($stafTarget->id)->not->toContain($stafLain->id);
+    expect($visible)->toContain($stafTarget->id)
+        ->not->toContain($stafLain->id)
+        ->not->toContain($org['userDirut']->id); // Direksi tidak pernah lihat lokasinya sendiri
 });
