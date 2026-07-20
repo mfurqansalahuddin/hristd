@@ -112,7 +112,7 @@ test('kehadiran: hari Alpa mengurangi rasio hadir', function () {
     expect((float) $final->score_kehadiran)->toBe($expected);
 });
 
-test('pakaian dinas: dedup harian, deduction_point 0 fallback ke default 20', function () {
+test('pakaian dinas: dedup harian, deduction_point 0 fallback ke default 5', function () {
     $staf = User::factory()->create(['job_level' => 4]);
     $reporter = User::factory()->create();
 
@@ -128,11 +128,11 @@ test('pakaian dinas: dedup harian, deduction_point 0 fallback ke default 20', fu
 
     $final = $this->service->calculateForUser($staf, $this->period);
 
-    // (100 - 20) / 100 * 5 = 4.0
-    expect((float) $final->score_pakaian)->toBe(4.0);
+    // (100 - 5) / 100 * 5 = 4.75
+    expect((float) $final->score_pakaian)->toBe(4.75);
 });
 
-test('integritas: pengurangan flat per kategori, floor 0 tidak minus', function () {
+test('integritas: pengurangan flat per kategori dari sumber Aduan Perusahaan, floor 0 tidak minus, digabung 4 sumber', function () {
     $staf = User::factory()->create(['job_level' => 4]);
     $reporter = User::factory()->create();
     $etika = KpiIntegrityCategory::where('name', 'Etika')->first(); // deduction_value 10
@@ -151,9 +151,10 @@ test('integritas: pengurangan flat per kategori, floor 0 tidak minus', function 
 
     $final = $this->service->calculateForUser($staf, $this->period);
 
-    $categoryMaxTotal = KpiIntegrityCategory::sum('deduction_value'); // 100 (default seed)
-    $expected = round((($categoryMaxTotal - 10) / $categoryMaxTotal) * 20, 2); // cuma Etika yg zeroed, floor 0
-    expect((float) $final->score_integritas)->toBe($expected);
+    // Hanya sumber ADUAN_PERUSAHAAN yang punya temuan (Etika zeroed): (100-10)/100*100 = 90.
+    // Penilai 1/2/3 tidak punya keputusan -> skor penuh 100 tiap sumber (belum dinilai, bukan "aman").
+    // Rata-rata tertimbang 25/25/25/25: (90+100+100+100)/4 = 97.5, diskalakan ke bobot 20 -> 19.5.
+    expect((float) $final->score_integritas)->toBe(19.5);
 });
 
 test('kriteria tambahan aktif ikut dijumlah ke grand_total_score sebagai bucket ekstra', function () {

@@ -18,6 +18,26 @@ class Location extends Model
     }
 
     /**
+     * Semua lokasi kantor dalam bentuk siap gambar di minimap (Home + Live Location).
+     *
+     * @return array<int, array{id: int, name: string, type: string, lat: float, long: float, radius_meters: ?int, polygon: ?array}>
+     */
+    public static function forMinimap(): array
+    {
+        return static::all(['id', 'name', 'type', 'lat', 'long', 'radius_meters', 'polygon'])
+            ->map(fn (self $location) => [
+                'id' => $location->id,
+                'name' => $location->name,
+                'type' => $location->type,
+                'lat' => (float) $location->lat,
+                'long' => (float) $location->long,
+                'radius_meters' => $location->radius_meters,
+                'polygon' => $location->polygon,
+            ])
+            ->all();
+    }
+
+    /**
      * Cek apakah sebuah titik koordinat berada di dalam area lokasi ini (§8.1.1 plan.md).
      */
     public function containsPoint(float $lat, float $lng): bool

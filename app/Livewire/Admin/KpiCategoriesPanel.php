@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Models\KpiComponentWeight;
 use App\Models\KpiExtraCriterion;
 use App\Models\KpiIntegrityCategory;
+use App\Models\KpiIntegritySourceWeight;
 use Livewire\Component;
 
 class KpiCategoriesPanel extends Component
@@ -21,6 +22,10 @@ class KpiCategoriesPanel extends Component
     public string $newName = '';
 
     public ?int $newDeductionValue = null;
+
+    public array $sourceWeightEdits = [];
+
+    public array $savedSourceWeightEdits = [];
 
     public array $criteriaEdits = [];
 
@@ -42,6 +47,7 @@ class KpiCategoriesPanel extends Component
         $this->syncComponentEdits();
         $this->syncEdits();
         $this->syncCriteriaEdits();
+        $this->syncSourceWeightEdits();
     }
 
     public function weightsTotal(): int
@@ -84,6 +90,46 @@ class KpiCategoriesPanel extends Component
             ->toArray();
 
         $this->savedComponentEdits = $this->componentEdits;
+    }
+
+    public function sourceWeightsTotal(): int
+    {
+        return array_sum(array_column($this->sourceWeightEdits, 'weight'));
+    }
+
+    public function isSourceWeightDirty(int $sourceId): bool
+    {
+        $current = $this->sourceWeightEdits[$sourceId] ?? null;
+        $saved = $this->savedSourceWeightEdits[$sourceId] ?? null;
+
+        if ($current === null || $saved === null) {
+            return $current !== $saved;
+        }
+
+        return (int) $current['weight'] !== (int) $saved['weight'];
+    }
+
+    public function updateSourceWeight(int $sourceId): void
+    {
+        $data = $this->validate([
+            "sourceWeightEdits.{$sourceId}.weight" => ['required', 'integer', 'min:0', 'max:100'],
+        ]);
+
+        KpiIntegritySourceWeight::whereKey($sourceId)->update($data['sourceWeightEdits'][$sourceId]);
+        $this->savedSourceWeightEdits[$sourceId] = $this->sourceWeightEdits[$sourceId];
+
+        session()->flash('success', 'Bobot sumber integritas diperbarui.');
+    }
+
+    private function syncSourceWeightEdits(): void
+    {
+        $this->sourceWeightEdits = KpiIntegritySourceWeight::all()
+            ->mapWithKeys(fn (KpiIntegritySourceWeight $source) => [
+                $source->id => ['weight' => $source->weight],
+            ])
+            ->toArray();
+
+        $this->savedSourceWeightEdits = $this->sourceWeightEdits;
     }
 
     public function storeIntegrityCategory(): void
@@ -230,9 +276,11 @@ class KpiCategoriesPanel extends Component
     public function render()
     {
         $order = array_flip(array_keys(KpiComponentWeight::LABELS));
+        $sourceOrder = array_flip(array_keys(KpiIntegritySourceWeight::LABELS));
 
         return view('livewire.admin.kpi-categories-panel', [
             'weightRows' => KpiComponentWeight::all()->sortBy(fn (KpiComponentWeight $row) => $order[$row->component] ?? 99)->values(),
+            'sourceWeightRows' => KpiIntegritySourceWeight::all()->sortBy(fn (KpiIntegritySourceWeight $row) => $sourceOrder[$row->source] ?? 99)->values(),
         ]);
     }
 }

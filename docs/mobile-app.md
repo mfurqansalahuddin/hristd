@@ -59,19 +59,23 @@ user, teks netral kalau tinggal menunggu:
 
 Tap baris ini (kecuali state `CLOSED`) → masuk ke sub-tab 5.1 KPI Bulanan.
 
-### 2.2 Baris jumlah rekan kerja & bawahan yang perlu dinilai
+### 2.2 Baris jumlah pegawai yang perlu dinilai (Kinerja & Integritas)
 
-**(2026-07-16)** 2 baris terpisah (bukan digabung):
+**(Update 2026-07-20)** 2 baris terpisah (bukan digabung), field API berubah
+dari `{peers, subordinates}` jadi `{kinerja, integritas}` — semantiknya
+sekarang per-bucket, bukan per-relasi (peer vs bawahan), karena Penilai 3
+tidak lagi menilai Kinerja (dialihkan ke Integritas, §1 `kpi-calculation.md`):
 
-- "Ada **{jumlah}** rekan kerja yang perlu dinilai" atau "Anda sudah menilai
-  semua rekan anda" — dari slot Penilai 3 (rekan sejawat, §1
-  `kpi-calculation.md`).
-- "Ada **{jumlah}** bawahan anda yang perlu dinilai" atau "Anda telah
-  menilai semua bawahan anda" — dari slot Penilai 1/2 (hierarki atasan).
+- "Ada **{jumlah}** pegawai yang perlu dinilai Kinerja-nya" atau "Anda sudah
+  menilai Kinerja semua pegawai" — dari slot Penilai 1/2 saja. Tap → sub-tab
+  5.4 Beri Penilaian.
+- "Ada **{jumlah}** pegawai yang perlu dinilai Integritas-nya" atau "Anda
+  sudah menilai Integritas semua pegawai" — dari slot Penilai 1/2/3
+  (§5 `kpi-calculation.md`). Tap → sub-tab baru 5.4b Beri Penilaian Integritas.
 
-Keduanya tap → sub-tab 5.4 Beri Penilaian. Selama masih ada yang belum
-dinilai, push notif pengingat **2× sehari (pagi & sore)** — bukan tiap jam,
-supaya tidak terasa spam (dikonfirmasi user 2026-07-16).
+Selama masih ada yang belum dinilai, push notif pengingat **2× sehari (pagi
+& sore)** — bukan tiap jam, supaya tidak terasa spam (dikonfirmasi user
+2026-07-16).
 
 ### 2.3 Ikon lonceng — pengajuan Sakit bawahan
 
@@ -84,7 +88,7 @@ sub-tab Sakit-Approval.
 | Endpoint                         | Status            | Request         | Response                                                                                                                                                                                                                                               |
 | -------------------------------- | ----------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `GET /api/user`                  | ✅ ada, diperkaya | —               | `User` + `department`, `jabatan_label`, `photo_url`                                                                                                                                                                                                    |
-| `GET /api/home`                  | ✅ ada            | —               | `{ greeting_name, kpi_phase: {period, status, my_step}, last_month_score, attendance_today: {clocked_in, clocked_out}, pending_evaluations: {peers, subordinates}, pending_sick_approvals }` — 1 call gabungan untuk §2.1-2.3, hindari N call terpisah |
+| `GET /api/home`                  | ✅ ada            | —               | `{ greeting_name, kpi_phase: {period, status, my_step}, last_month_score, attendance_today: {clocked_in, clocked_out}, pending_evaluations: {kinerja, integritas} (2026-07-20, dulu {peers, subordinates}), pending_sick_approvals }` — 1 call gabungan untuk §2.1-2.3, hindari N call terpisah |
 | `POST /api/attendance/clock-in`  | ✅ ada            | `{ lat, long }` | lihat §3                                                                                                                                                                                                                                               |
 | `POST /api/attendance/clock-out` | ✅ ada            | `{ lat, long }` | lihat §3                                                                                                                                                                                                                                               |
 | `POST /api/location/ping`        | ✅ ada            | `{ lat, long }` | lihat §4                                                                                                                                                                                                                                               |
@@ -295,10 +299,11 @@ terpisah dari tombol Approve/Revisi, bisa dipakai kapan saja.
   total bucket yang dijumlah jadi 7.
 - Tombol **Kembali** → balik ke list, bisa pilih nama lain.
 
-Siapa menilai siapa mengikuti 3-penilai per level (lihat
-`docs/kpi-calculation.md` §1): Staf dinilai Kasi/Kabag/rekan seksi; Kasi
-dinilai Kabag/Direktur Bidang/rekan sesama Kasi; Kabag-setara dinilai
-Direktur Bidang/Direktur Utama/rekan sesama Kabag.
+**(Update 2026-07-20)** Siapa menilai siapa mengikuti **2-penilai** per level
+(lihat `docs/kpi-calculation.md` §1): Staf dinilai Kasi/Kabag; Kasi dinilai
+Kabag/Direktur Bidang; Kabag-setara dinilai Direktur Bidang/Direktur Utama.
+Rekan sejawat (Penilai 3) tidak lagi ikut menilai Kinerja — lihat §5.4b Beri
+Penilaian Integritas untuk tugas barunya.
 
 **Dispute (masa sanggah, tampilan saja — §9 `plan.md`, dikonfirmasi &
 direvisi 2026-07-16):** tidak ada tracker 4-centang per item. Selama masa
@@ -315,23 +320,48 @@ jadi **tidak ada** tombol/form ajukan-sanggahan di app.
 
 | Endpoint                              | Status | Request                                                                               | Response                                                                                                                                                                                                                                                                                                                            | Catatan                                                                                                                                                                                                                                                                                              |
 | ------------------------------------- | ------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/kpi/evaluations/pending`    | ✅ ada | —                                                                                     | `{ data: [{ user_id, name, evaluator_role, is_peer, self_assessment_done, already_evaluated }] }` yang perlu dinilai user ini                                                                                                                                                                                                       | `evaluator_role` = PENILAI_1..3. `is_peer` dipakai Home §2.2 utk pisah counter rekan vs bawahan                                                                                                                                                                                                      |
+| `GET /api/kpi/evaluations/pending`    | ✅ ada | —                                                                                     | `{ data: [{ user_id, name, evaluator_role, is_peer, self_assessment_done, already_evaluated }] }` yang perlu dinilai user ini                                                                                                                                                                                                       | **(2026-07-20)** `evaluator_role` sekarang cuma PENILAI_1/2 — entry PENILAI_3 difilter di server (rekan sejawat pindah ke §5.4b). `is_peer` selalu `false` di list ini sekarang, dipertahankan di response demi kompatibilitas skema, tidak lagi dipakai Home §2.2 (lihat `{kinerja, integritas}`) |
 | `GET /api/kpi/evaluations/{userId}`   | ✅ ada | —                                                                                     | `{ data: KpiPlan[], extra_criteria: [{id, name, description, score, reason}] }` (status APPROVED) user yang mau dinilai — `extra_criteria` (2026-07-16) = semua kriteria `is_active`, `score`/`reason` sudah terisi kalau evaluator ini sudah pernah menilai. 403 kalau caller bukan salah satu penilainya                                                                                                                                                                                                                         |                                                                                                                                                                                                                                                                                                      |
 | `POST /api/kpi/evaluations/{userId}`  | ✅ ada | `{ kpi_plan_id, score, note }` — **1 item per call**, ikut alur simpan-per-item di UI | Insert/update 1 baris `kpi_evaluations` (unique per plan+evaluator, submit ulang = update)                                                                                                                                                                                                                                          | 403 kalau caller bukan penilainya; `evaluator_role` ditentukan server dari `EvaluatorResolutionService`, bukan dikirim client                                                                                                                                                                        |
 | `POST /api/kpi/evaluations/{userId}/criteria` | ✅ ada (2026-07-16) | `{ kpi_extra_criterion_id, score, reason }` — 1 kriteria per call | Insert/update 1 baris `kpi_extra_criteria_scores` (unique per kriteria+user+period+evaluator) | Sama pola otorisasi dengan endpoint di atas |
 | `GET /api/kpi/final-score?period_id=` | ✅ ada | query `period_id`                                                                     | Selama DRAFT/EVALUATION: `{ progress: [{kpi_plan_id, evaluators_done, evaluators_total}] }` saja (tanpa skor/alasan, `final_score`/`evaluations` null). Setelah `DISPUTE`/`CLOSED`: `{ final_score, evaluations: [{kpi_plan_id, evaluator_role, evaluator_name, score, note}], extra_criteria: [{id, name, score}] }` (Penilai 3 `evaluator_name` null, `progress` null) — `extra_criteria` (2026-07-16) breakdown skor kriteria tambahan, ikut aturan visibilitas yang sama | Server yang menentukan level detail berdasar `kpi_periods.status`, bukan client — supaya skor tidak bocor sebelum waktunya. Dipakai juga sbg tampilan masa sanggah — **tidak ada** endpoint submit dispute terpisah (`POST /api/kpi/disputes`/`GET /api/kpi/disputes/eligible` dihapus dari rencana) |
 
+### 5.4b Sub-tab "Beri Penilaian Integritas" (BARU, 2026-07-20)
+
+Terpisah dari 5.4 — diakses lewat baris kedua di Home (§2.2) atau tab
+tersendiri di halaman KPI. Berlaku untuk **ketiga** slot (Penilai 1/2/3,
+termasuk rekan sejawat yang dibebaskan dari Kinerja) sebagai review wajib
+per periode atas 8 sub-kategori Integritas (`docs/kpi-calculation.md` §5).
+
+**Tampilan & data:**
+
+- Sama pola "Perlu Dinilai ({n})" / "Sudah Dinilai ({m})" seperti 5.4.
+- Tap nama → detail: 8 kategori integritas, tiap kategori punya toggle
+  **Biarkan** / **Kurangi**. Pilih **Kurangi** membuka field **Alasan**
+  (wajib) + **Foto** (wajib) — pilih **Biarkan** tidak butuh keduanya.
+  Simpan **per kategori** (bukan 1 tombol submit di akhir).
+- Tombol **Kembali** → balik ke list.
+
+| Endpoint                                    | Status | Request                                                                                  | Response                                                                        | Catatan                                                                                                    |
+| -------------------------------------------- | ------ | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `GET /api/kpi/integrity-evaluations/pending` | ✅ ada | —                                                                                          | `{ data: [{ user_id, name, evaluator_role, already_evaluated }] }`               | `evaluator_role` = PENILAI_1..3, ketiga slot muncul (beda dari §5.4 yang cuma 1/2)                            |
+| `GET /api/kpi/integrity-evaluations/{userId}` | ✅ ada | —                                                                                          | `{ data: [{ id, name, decision, description, photo_path }] }` 8 kategori         | `decision` null kalau belum dinilai evaluator ini. 403 kalau caller bukan salah satu dari 3 penilainya       |
+| `POST /api/kpi/integrity-evaluations/{userId}` | ✅ ada | `{ kpi_integrity_category_id, decision: BIARIN\|KURANGIN, description?, photo? }` — 1 kategori per call | Insert/update 1 baris `kpi_integrity_evaluations` (unique per kategori+user+period+evaluator) | `description`+`photo` wajib kalau `decision=KURANGIN`. `evaluator_role` ditentukan server, bukan dikirim client |
+
 ### 5.5 Sub-tab "Aduan Disiplin Pakaian & Integritas"
 
 **Tampilan & data:** cari nama (dropdown searchable), foto (wajib untuk
 Pakaian Dinas), deskripsi, pilih jenis pelanggaran (kalau Integritas → pilih
-1 dari 8 sub-kategori). Integritas terkunci hanya atasan→bawahan; Pakaian
-Dinas terbuka untuk semua pelapor.
+1 dari 8 sub-kategori). **(Update 2026-07-20)** Integritas kini juga terbuka
+untuk semua pelapor (dulu terkunci hanya atasan→bawahan) — jadi sumber
+"Aduan Perusahaan", salah satu dari 4 sumber Integritas
+(`docs/kpi-calculation.md` §5), terpisah dari review wajib Penilai 1/2/3 di
+§5.4b. Pakaian Dinas tidak berubah, tetap terbuka untuk semua pelapor.
 
 | Endpoint                   | Status | Request                                                                                                                                                                    | Response                                             | Catatan                                                                                                            |
 | -------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `GET /api/users/search?q=` | ✅ ada | query `q`                                                                                                                                                                  | `{ data: [{ id, name, nik, department }] }` (max 20) | Autocomplete, versi non-admin dari pencarian pegawai                                                               |
-| `POST /api/violations`     | ✅ ada | `{ reported_user_id, category: PAKAIAN_DINAS\|INTEGRITAS, description, integrity_category_id? (wajib jika INTEGRITAS), photo? (wajib jika PAKAIAN_DINAS), incident_date }` | `violation_reports` baru, status PENDING             | Server validasi atasan langsung→bawahan utk Integritas (403 kalau bukan). 422 kalau tidak ada periode KPI berjalan |
+| `POST /api/violations`     | ✅ ada | `{ reported_user_id, category: PAKAIAN_DINAS\|INTEGRITAS, description, integrity_category_id? (wajib jika INTEGRITAS), photo? (wajib jika PAKAIAN_DINAS), incident_date }` | `violation_reports` baru, status PENDING             | **(2026-07-20)** Tidak ada lagi validasi atasan-bawahan utk Integritas — siapapun boleh lapor. 422 kalau tidak ada periode KPI berjalan. Divalidasi lewat panel admin Validasi Aduan (`docs/kpi-calculation.md`) |
 
 **Direksi:** tab KPI hanya menampilkan 5.4 (Direktur Bidang menilai
 Kabag+Kasi; Dirut menilai Kabag-setara saja) dan 5.3 khusus Direktur Bidang
@@ -433,3 +463,86 @@ Tidak ada endpoint submit DL dari sisi pegawai.
 10. ⬜ Migrasi tambahan yang ditemukan saat implementasi (belum di draf awal dokumen ini): `violation_reports.integrity_category_id` (FK ke `kpi_integrity_categories`, wajib utk hitung skor Integritas per kategori) dan `kpi_evaluations.note` (kolom "Alasan" yang didokumentasikan di §5.4 tapi belum ada di migration lama) — **kedua migrasi ini sudah dibuat (2026-07-16)**.
 11. ✅ Migrasi (2026-07-16): tabel `kpi_extra_criteria` (master, admin `/admin/kpi-categories`), `kpi_extra_criteria_scores` (evaluator × kriteria × periode), `kpi_final_score_extras` (breakdown per kriteria di `kpi_final_scores`) — lihat §5.4. `KpiEvaluationService::calculateForUser()` diperluas untuk menjumlahkan skor kriteria aktif ke `grand_total_score`, di luar 5 bucket tetap.
 12. ✅ `kpi_plan_reviews.action` (2026-07-16): nilai baru `TASK_REQUESTED` (kolom sudah `string` polos, tidak perlu migrasi) — dipakai `POST /api/kpi/approvals/{userId}/request-task`, lihat §5.3.
+
+---
+
+## 9. Rencana Pembangunan Project Mobile (Fase E)
+
+Fase D (API) sudah selesai (§1-§8 di atas, semua ✅). Bagian ini task list
+utk fase berikutnya: bikin project Capacitor+Vue-nya sendiri, yang **belum
+ada sama sekali** (lihat `plan.md` §12 Fase E).
+
+### 9.1 Struktur folder
+
+Project Capacitor **terpisah** dari Laravel (`package.json`/`node_modules`
+sendiri) — sibling folder, bukan nested di dalam `resources/`, dan Laravel
+juga tidak pindah "ke dalam" folder mobile:
+
+```
+www/xxxx/            ← folder induk baru (belum ada sekarang)
+├── hristd/           ← project Laravel ini, dipindah ke sini apa adanya
+└── hristdmobile/     ← project Capacitor+Vue baru, dibuat dari nol
+```
+
+Keduanya independen — mobile app cuma bicara ke Laravel lewat HTTP(S) (base
+URL), jadi pindah folder `hristd` **tidak** butuh perubahan kode Laravel apa
+pun. Yang perlu disesuaikan cuma env/base URL di sisi `hristdmobile` kalau
+domain/port lokal berubah.
+
+### 9.2 Inisialisasi project
+
+- ⬜ `npm create vite@latest hristdmobile -- --template vue` (atau Vue+TS) di
+  `www/xxxx/hristdmobile`
+- ⬜ `npx cap init` (app id, app name) + `npx cap add android` / `npx cap add
+  ios`
+- ⬜ Pasang plugin sesuai kebutuhan spek layar §1-§7: `@capacitor/geolocation`
+  (GPS absen/live location/minimap), `@capacitor/camera` (foto
+  pelanggaran/surat sakit/profil/logbook), `@capacitor/preferences` (simpan
+  token — bukan `localStorage`, tidak reliable di webview iOS),
+  `@capacitor/push-notifications` (kalau lanjut ke §8 poin 9 di atas, masih
+  ⬜)
+
+### 9.3 Konfigurasi API & environment (sisi Laravel, `hristd`)
+
+- ⬜ Publish/isi `config/cors.php` (belum ada file-nya sekarang) —
+  `allowed_origins` perlu cakup origin webview Capacitor
+  (`capacitor://localhost` iOS, `http://localhost` Android default) + origin
+  dev (LAN IP/ngrok). Auth mobile pakai Bearer token (Sanctum PAT via
+  `POST /api/login`, bukan cookie SPA — dikonfirmasi di `plan.md` §13), jadi
+  **tidak** butuh `SANCTUM_STATEFUL_DOMAINS`/credentials di CORS, tapi
+  `Authorization` harus ada di `allowed_headers`.
+- ⬜ `APP_URL` dev sekarang `http://hristd.test` — hostname `.test` cuma
+  resolve di mesin dev sendiri, **tidak** bisa diakses dari HP/emulator.
+  Siapkan base URL yang reachable dari device: LAN IP mesin dev (mis.
+  `http://192.168.x.x:8000`) atau tunnel (ngrok/expose), disetel lewat env
+  Capacitor (`hristdmobile/.env`), bukan diubah di `hristd/.env`.
+- ⬜ HTTPS/cleartext — Android API 28+ blokir HTTP plain by default. Device
+  fisik butuh HTTPS beneran (prod) atau `android:usesCleartextTraffic="true"`
+  + network security config khusus dev saat testing lokal.
+- ⬜ `php artisan storage:link` sudah jalan di environment yang dipakai
+  testing, supaya `photo_url` (profil/logbook/violation) resolve.
+- ⬜ Kalau lanjut live location real-time (bukan polling) — channel Reverb
+  privat (§8 poin 6, masih ⬜) butuh `REVERB_HOST`/port yang reachable dari
+  device, bukan `localhost`.
+
+### 9.4 Frontend logic — integrasi API
+
+- ⬜ HTTP client (axios/fetch wrapper) — base URL dari env, interceptor
+  attach `Authorization: Bearer <token>` dari `@capacitor/preferences`.
+- ⬜ Auth flow: layar Login → `POST /api/login` → simpan token → redirect
+  Home; 401 di response mana pun → clear token → balik ke Login.
+- ⬜ Susun screen/router sesuai urutan §1-§7 (Login → Home → Absen → Live
+  Location → KPI Bulanan → Profil → Izin), tiap layar konsumsi endpoint yang
+  sudah didaftar per-section di atas (semua ✅ ada, siap dites lewat
+  `/docs/api` sebelum ada UI).
+- ⬜ GPS: `@capacitor/geolocation` utk clock-in/out (§3) + ping tiap 1
+  menit/≥10m (§4), berhenti otomatis di luar jam kerja (logic ini di client,
+  bukan server).
+- ⬜ Upload foto: `@capacitor/camera` → `multipart/form-data` ke endpoint
+  terkait (§5.5 pelanggaran, §7.2 sakit >1 hari, §6 profil/logbook).
+
+### 9.5 Build & jalankan saat dev
+
+- ⬜ `npx cap sync` tiap habis install plugin baru / ubah web build.
+- ⬜ Live reload ke device: `npx cap run android -l --external` (pakai LAN IP
+  dev server Vite) — alternatif dari build APK ulang tiap perubahan kecil.

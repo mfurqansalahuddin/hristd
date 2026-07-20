@@ -193,7 +193,7 @@ Sumber kebenaran cukup dua kolom pada `users`: **`department_id`** (posisi di po
 
 ## 5. Logika Penilai (Evaluator) KPI
 
-Skema 5-bucket total 100 tidak berubah (§7). Komponen **Kinerja Teknis (50%)** dinilai oleh **3 penilai di semua level** (Staf, Kasi, Kabag-setara — lihat §5.2). Bobot per slot seragam 33/33/34 di ketiga level (§5.4, revert 2026-07-15 — lihat catatan pembuka dokumen).
+Skema 5-bucket total 100 tidak berubah (§7). Komponen **Kinerja Teknis (50%)** dinilai oleh **hanya Penilai 1 & 2 di semua level** (atasan langsung + atasan dari atasan — lihat §5.2), bobot 50/50 (§5.4, update 2026-07-20). **Penilai 3 (rekan sejawat) tidak lagi ikut menilai Kinerja** — struktur resolusi Penilai 1/2/3 (`EvaluatorResolutionService`, §5.1-§5.3) tidak berubah sama sekali, hanya slot 3 kini dialihkan penuh ke tugas Integritas (§7.1) alih-alih Kinerja.
 
 ### 5.1. Prinsip Umum
 
@@ -236,15 +236,15 @@ Larangan: dalam satu grup, A menilai B **dan** B menilai A pada periode yang sam
 
 ### 5.4. Bobot antar Penilai (dari total 50% Kinerja)
 
-Seragam di semua level — 3 slot per level, 33/33/34 (§5.1, revert 2026-07-15 — sebelumnya sempat 4 slot/25-25-25-25 khusus Kasi per update 2026-07-14, dibatalkan).
+**(Update 2026-07-20)** Seragam di semua level — 2 slot aktif per level, 50/50. Penilai 3 tetap dihitung oleh `EvaluatorResolutionService` (dipakai untuk Integritas, §7.1) tapi bobotnya di tabel ini diset 0 sehingga tidak berkontribusi ke skor Kinerja — bukan dihapus dari skema, supaya `kinerjaScore()`/`extraCriterionScore()` tidak perlu logika khusus (evaluator dengan bobot 0 otomatis tidak berkontribusi).
 
-| Level        | Penilai 1             | Penilai 2             | Penilai 3                |
-| ------------ | --------------------- | --------------------- | ------------------------ |
-| Staf         | Kasi — 33%            | Kabag — 33%           | Rekan seksi — 34%        |
-| Kasi         | Kabag — 33%           | Direktur Bidang — 33% | Rekan sesama Kasi — 34%  |
-| Kabag-setara | Direktur Bidang — 33% | Direktur Utama — 33%  | Rekan sesama Kabag — 34% |
+| Level        | Penilai 1             | Penilai 2             | Penilai 3 (tidak menilai Kinerja) |
+| ------------ | --------------------- | --------------------- | ---------------------------------- |
+| Staf         | Kasi — 50%            | Kabag — 50%           | Rekan seksi — 0%                   |
+| Kasi         | Kabag — 50%           | Direktur Bidang — 50% | Rekan sesama Kasi — 0%             |
+| Kabag-setara | Direktur Bidang — 50% | Direktur Utama — 50%  | Rekan sesama Kabag — 0%            |
 
-**(2026-07-14, dikonfirmasi)** Bobot di atas disimpan di master table `kpi_evaluator_weights` (job_level, slot, weight), bukan hard-code — HRD bisa ubah tanpa deploy kode. Lihat §10 untuk skema, §13 untuk riwayat keputusan.
+Bobot di atas disimpan di master table `kpi_evaluator_weights` (job_level, slot, weight), bukan hard-code — HRD bisa ubah tanpa deploy kode. Lihat §10 untuk skema, §13 untuk riwayat keputusan. Riwayat: sebelum 2026-07-20 ketiga slot aktif menilai Kinerja seragam 33/33/34 di semua level.
 
 ---
 
@@ -277,13 +277,13 @@ Tidak ada validasi server-side yang menolak submit karena departemen sudah teris
 
 ## 7. Penilaian Akhir Bulanan (5 Bucket, Total 100)
 
-1. **Kinerja Teknis (50%)** — lihat §5 untuk rincian 3 penilai.
+1. **Kinerja Teknis (50%)** — lihat §5 untuk rincian, kini hanya Penilai 1 & 2 (update 2026-07-20).
 2. **Kehadiran (20%)** — rasio hari hadir, dihitung otomatis dari sistem absensi (HRIS).
 3. **Apel Pagi (5%)** — khusus hari Senin (apel mingguan), bukan setiap hari kerja. `is_apel = true` otomatis kalau ada absen tercatat pada hari Senin itu. Rasio 5% = jumlah Senin ber-`is_apel=true` dibagi total Senin dalam periode.
-4. **Pakaian Dinas (5%)** — default 100, dipotong oleh aduan foto tervalidasi.
-5. **Integritas (20%)** — default 100 per pegawai, dipecah ke 8 sub-kategori berbobot (§7.1), dikurangi oleh aduan atasan tervalidasi pada kategori terkait (skema pengurang, bukan skema tambah).
+4. **Pakaian Dinas (5%)** — default 100, dipotong oleh aduan foto tervalidasi (§8.4).
+5. **Integritas (20%)** — **(update 2026-07-20, revisi dari model 1-sumber)** kini digabung dari **4 sumber berbobot** (default 25/25/25/25, admin-editable di `kpi_integrity_source_weights`): Penilai 1, Penilai 2, dan rekan seksi acak (Penilai 3 — dibebaskan dari Kinerja, dialihkan penuh ke sini) masing-masing melakukan review wajib per periode atas 8 sub-kategori (§7.1), plus **Aduan Perusahaan** (company-wide, siapapun boleh lapor — bukan lagi terbatas ke atasan langsung, §8.4). Tiap sumber dihitung skornya sendiri, lalu 4 skor sumber digabung berbobot jadi 1 skor Integritas akhir.
 
-### 7.1. Sub-Kategori Integritas (total 100, sebelum dikonversi ke bobot 20%)
+### 7.1. Sub-Kategori Integritas (total 100, sebelum dikonversi ke bobot 20%) — dihitung 4×, 1× per sumber
 
 | Skor Maks | Kategori                        |
 | --------- | ------------------------------- |
@@ -296,7 +296,10 @@ Tidak ada validasi server-side yang menolak submit karena departemen sudah teris
 | 10        | Inisiatif                       |
 | 10        | Tugas Tambahan                  |
 
-Pegawai mulai dari skor penuh di tiap kategori (total 100). Aduan atasan tervalidasi pada kategori tertentu mengurangi skor kategori itu (floor 0, tidak minus). Skor akhir = total 8 kategori setelah pengurangan, dikonversi proporsional ke bobot 20% bucket. **(2026-07-14, dikonfirmasi)** Pengurangan **flat per kejadian** sesuai `kpi_integrity_categories.deduction_value` (§10) — bukan berjenjang. Titik terbuka yang tersisa: dedup harian (§8.4) dicek saat submit aduan (tolak dobel) atau saat hitung skor (abaikan dobel secara diam-diam) — lihat §13.
+Tiap sumber (Penilai 1/2/3, Aduan Perusahaan) mulai dari skor penuh di tiap kategori (total 100 per sumber). Temuan tervalidasi/`KURANGIN` dari sumber itu pada kategori tertentu men-nol-kan skor kategori itu **untuk sumber itu saja** (floor 0, tidak minus, pengurangan **flat per kejadian** — bukan berjenjang, tidak berpengaruh ke 3 sumber lain). Skor tiap sumber = total 8 kategori setelah pengurangan. Skor akhir Integritas = rata-rata tertimbang 4 skor sumber (bobot dari `kpi_integrity_source_weights`), dikonversi proporsional ke bobot 20% bucket.
+
+- **Penilai 1/2/3** (`kpi_integrity_evaluations`, wajib per periode) — untuk tiap kategori, evaluator memilih **BIARIN** (tidak ada temuan) atau **KURANGIN** (ada temuan); memilih KURANGIN mewajibkan `description` (alasan) + `photo`. Tidak ada tahap validasi HR terpisah untuk sumber ini — evaluator yang berwenang (dihitung via §5) langsung menentukan, mirip `kpi_evaluations` untuk Kinerja.
+- **Aduan Perusahaan** (`violation_reports` category=INTEGRITAS) — tetap pakai model lama: siapapun di seluruh Perumda boleh lapor (bukan lagi dikunci ke atasan langsung, §8.4), divalidasi lewat panel admin **Validasi Aduan** (§8.4), tiap laporan tervalidasi men-nol-kan kategori terkait untuk sumber ini saja. Dedup harian (kejadian sama, orang sama, hari sama dianggap 1×) tetap berlaku khusus sumber ini, dicek saat hitung skor.
 
 ---
 
@@ -325,7 +328,7 @@ Form pegawai admin (`pages/admin/locations/form.blade.php`) pakai peta mini **Le
 
 ### 8.2. Cuti (Hybrid)
 
-Ajukan di HP → proses kertas manual → HRD klik Approve di web → `AttendanceService::injectAttendanceForApprovedLeave` (sudah ada) mengisi kehadiran 100% pada rentang tanggal.
+Ajukan di HP → proses kertas manual → HRD klik Approve di web → `AttendanceService::injectAttendanceForApprovedLeave` (sudah ada) mengisi kehadiran 100% pada rentang tanggal (semua hari kalender, termasuk Minggu — tidak berubah). **(Update 2026-07-20)** Untuk tipe CUTI, method yang sama juga memotong `users.leave_balance` sebesar **hari kerja saja** (Senin-Sabtu, `AttendanceService::workingDaysBetween()`) — Minggu dalam rentang cuti tidak ikut memotong jatah. Sakit/Izin/Dinas Luar tidak memotong jatah cuti sama sekali (§16.1). Saldo boleh negatif (tidak diblokir sistem) — murni sinyal untuk HR.
 
 ### 8.3. Live Tracking
 
@@ -333,7 +336,9 @@ Ping lokasi ke `user_current_locations` (1-to-1, overwrite) tiap 1 menit. `last_
 
 ### 8.4. Aduan 360° (Tiered Evidence)
 
-Pakaian Dinas: terbuka untuk semua pelapor, wajib foto. Integritas: terkunci hanya untuk atasan terhadap bawahan (dihitung via §5), wajib deskripsi + pilih salah satu dari 8 kategori (§7.1). Validasi oleh atasan langsung terlapor. Daily cap: aduan berulang kategori sama di hari sama untuk orang sama hanya dihitung 1×.
+Pakaian Dinas: terbuka untuk semua pelapor, wajib foto. **(Update 2026-07-20)** Integritas: **kini juga terbuka untuk semua pelapor** (dulu terkunci hanya atasan langsung → bawahan) — jadi sumber "Aduan Perusahaan", salah satu dari 4 sumber Integritas (§7.1); wajib deskripsi + pilih salah satu dari 8 kategori. Daily cap tetap berlaku: aduan berulang kategori sama di hari sama untuk orang sama hanya dihitung 1×.
+
+**Validasi**: bukan lagi per-laporan oleh atasan langsung terlapor — kini lewat panel admin **Validasi Aduan** (`/admin/kpi-violations`, `Livewire\Admin\ViolationsTable`), berlaku untuk Pakaian Dinas maupun Integritas. Panel mengelompokkan aduan PENDING per (orang, hari, kategori, sub-kategori) — kejadian berulang di hari yang sama untuk orang yang sama dianggap 1 baris (menampilkan jumlah aduan mentah di dalamnya), dengan filter tanggal + pencarian nama/NIK, dan tombol Validasi (konfirmasi dua-langkah in-app, bukan dialog browser) yang menandai seluruh baris dalam grup itu jadi VALIDATED sekaligus.
 
 ### 8.5. Logbook
 
@@ -411,13 +416,35 @@ Table kpi_plans {
 
 Table kpi_evaluator_weights {
   id int [pk, increment]
-  job_level tinyint [note: "4=Staf, 3=Kasi, 2=Kabag-setara — sekarang seragam 33/33/34 di ketiga level, tetap didata per job_level utk satu sumber kebenaran"]
+  job_level tinyint [note: "4=Staf, 3=Kasi, 2=Kabag-setara — sekarang seragam 50/50/0 di ketiga level (update 2026-07-20), tetap didata per job_level utk satu sumber kebenaran"]
   slot varchar [note: "ENUM: PENILAI_1, PENILAI_2, PENILAI_3"]
-  weight tinyint [note: "dari 50% Kinerja — sum per job_level harus 100 (lalu dikonversi ke bobot 50%), §5.4"]
+  weight tinyint [note: "dari 50% Kinerja — sum per job_level harus 100 (lalu dikonversi ke bobot 50%), §5.4. PENILAI_3 diset 0 (2026-07-20) — baris tetap ada, cuma tidak berkontribusi ke Kinerja lagi"]
 
   // BARU (2026-07-14, §13 poin 1) — master table, pola sama dgn kpi_component_weights (§10).
   // Dibuat karena bobot ini sudah terbukti berubah dalam sesi ini (3→4→3 penilai Kasi,
   // revert 2026-07-15 — lihat catatan pembuka dokumen).
+}
+
+Table kpi_integrity_source_weights {
+  id int [pk, increment]
+  source varchar [unique, note: "ENUM: PENILAI_1, PENILAI_2, PENILAI_3, ADUAN_PERUSAHAAN"]
+  weight tinyint [note: "sum harus 100 — default 25/25/25/25, admin-editable. BARU (2026-07-20, §7.1)"]
+}
+
+Table kpi_integrity_evaluations {
+  id int [pk, increment]
+  evaluator_id int [ref: > users.id]
+  reported_user_id int [ref: > users.id, note: "pegawai yang dinilai"]
+  period_id int [ref: > kpi_periods.id]
+  kpi_integrity_category_id int [ref: > kpi_integrity_categories.id, null]
+  evaluator_role varchar [note: "ENUM: PENILAI_1, PENILAI_2, PENILAI_3"]
+  decision varchar [note: "ENUM: BIARIN, KURANGIN"]
+  description text [null, note: "wajib kalau decision=KURANGIN"]
+  photo_path varchar [null, note: "wajib kalau decision=KURANGIN"]
+
+  // unique (evaluator_id, reported_user_id, period_id, kpi_integrity_category_id)
+  // BARU (2026-07-20, §7.1) — review wajib Penilai 1/2/3 per kategori Integritas,
+  // terpisah dari violation_reports (yang kini jadi sumber ke-4 "Aduan Perusahaan" saja).
 }
 
 Table kpi_plan_reviews {
@@ -451,7 +478,7 @@ Table leave_requests {
 
 `attendances` mendapat tambahan 4 kolom nullable untuk tab Kehadiran (§2, §8.1.1): `clock_in_lat decimal(10,8)`, `clock_in_long decimal(11,8)`, `clock_out_lat decimal(10,8)`, `clock_out_long decimal(11,8)` — diisi nanti oleh endpoint clock-in mobile (Fase D), untuk saat ini dipakai `Location::containsPoint()` menghitung badge dalam/luar lokasi kantor kalau datanya ada.
 
-Tabel lain (`user_current_locations`, `kpi_periods`, `violation_reports`, `kpi_disputes`, `kpi_final_scores`, `daily_activities`) tetap seperti migrasi saat ini — tidak ada perubahan. `kpi_plans` berubah (tambah nilai status `SUBMITTED`, lihat blok skema di atas). `leave_requests` berubah signifikan (§16) — lihat blok skema di atas. **(2026-07-14, §13 poin 4)** `committees`/`committee_members` **dihapus total** — migration, model (`Committee`, `CommitteeMember`), dan tabelnya di database sudah di-drop; tujuannya tidak pernah dijelaskan dan tidak dipakai fitur mana pun. Kalau nanti dibutuhkan lagi, rancang ulang dari kebutuhan bisnis yang jelas, bukan dipakai lagi dari skema lama.
+Tabel lain (`user_current_locations`, `kpi_periods`, `kpi_disputes`, `kpi_final_scores`, `daily_activities`) tetap seperti migrasi saat ini — tidak ada perubahan. `violation_reports` juga tidak berubah skema, tapi **aturan aksesnya berubah** (2026-07-20): `category=INTEGRITAS` tidak lagi dikunci ke atasan langsung (§8.4), dan tabel ini sekarang cuma jadi sumber ke-4 "Aduan Perusahaan" untuk Integritas (§7.1) — Penilai 1/2/3 pindah ke `kpi_integrity_evaluations`. `kpi_plans` berubah (tambah nilai status `SUBMITTED`, lihat blok skema di atas). `leave_requests` berubah signifikan (§16) — lihat blok skema di atas. **(2026-07-14, §13 poin 4)** `committees`/`committee_members` **dihapus total** — migration, model (`Committee`, `CommitteeMember`), dan tabelnya di database sudah di-drop; tujuannya tidak pernah dijelaskan dan tidak dipakai fitur mana pun. Kalau nanti dibutuhkan lagi, rancang ulang dari kebutuhan bisnis yang jelas, bukan dipakai lagi dari skema lama.
 
 Selain itu ada 2 tabel baru di luar skema V3.0 awal, untuk fitur Master Kategori KPI (§2): `kpi_component_weights` (5 baris tetap — Kinerja/Kehadiran/Apel/Pakaian Dinas/Integritas, tiap baris `component` + `weight`, sum harus 100) dan `kpi_integrity_categories` (master data bebas tambah/hapus — `name` + `deduction_value`, seed awal 8 kategori §7.1). Ditambah 2 tabel baru lagi hasil keputusan §13 (2026-07-14): `kpi_evaluator_weights` dan `kpi_plan_reviews` (lihat blok skema di atas).
 
@@ -462,6 +489,8 @@ Selain itu ada 2 tabel baru di luar skema V3.0 awal, untuk fitur Master Kategori
 - `kpi_final_score_extras`: `kpi_final_score_id`, `kpi_extra_criterion_id`, `score` — breakdown per kriteria, karena kolom tetap di `kpi_final_scores` tidak bisa menampung jumlah kriteria yang dinamis.
 
 `kpi_plan_reviews.action` juga dapat nilai baru `TASK_REQUESTED` (2026-07-16, kolom tetap `string` polos, tidak perlu migrasi) — instruksi atasan pertama minta bawahan menambah 1 item rencana kerja baru, terpisah dari komentar revisi item yang sudah ada; tidak mengubah status `kpi_plans`.
+
+**(2026-07-20)** 2 tabel baru lagi untuk revisi model Integritas (§7.1): `kpi_integrity_source_weights` (4 baris tetap — Penilai 1/2/3 + Aduan Perusahaan, default 25/25/25/25, pola sama dgn `kpi_component_weights`) dan `kpi_integrity_evaluations` (review wajib Penilai 1/2/3 per kategori per periode, lihat blok skema di atas). `kpi_evaluator_weights` tidak berubah skema, cuma nilai seed (33/33/34 → 50/50/0, §5.4) karena Penilai 3 tidak lagi menilai Kinerja.
 
 ---
 
@@ -514,13 +543,15 @@ Lengkapi `routes/api.php`: attendance clock-in/out (geofencing), kpi-plan submit
 
 ### Fase E — Mobile App (Capacitor + Vue)
 
-Sesuai rencana awal — belum dimulai. Spesifikasi layar — lihat §14.
+Sesuai rencana awal — belum dimulai. Spesifikasi layar — lihat §14. Task
+list setup project (struktur folder, konfigurasi API/CORS, langkah build) —
+lihat `docs/mobile-app.md` §9.
 
 ---
 
 ## 13. Pertanyaan Terbuka untuk Konfirmasi (⚠️ ringkasan semua asumsi di atas)
 
-Sudah dikonfirmasi user: bobot 33/33/34 untuk Staf & Kabag-setara (§5.4); Penilai 2 tidak eskalasi saat Kasi kosong, tetap Kabag walau rangkap slot (§5.1–5.2); Apel Pagi (5%) hanya dihitung dari hari Senin (§7 poin 3); Integritas (20%) dipecah 8 sub-kategori skema pengurang (§7.1); "Koperasi" cukup diwakili `instansi = KOPKARTIRDA`, bukan `employment_status` terpisah; `PEGAWAI_80` = status transisi Koperasi → Tirta Daroy dengan gaji 80% (§6.1); `username` field terpisah dari `email`, login menerima email/NIK/username (§6, §10) — sudah diimplementasikan. **(2026-07-14)** Kasi sempat diubah jadi 4 penilai (Kabag, Direktur Bidang, Direktur Utama, rekan), bobot rata 25/25/25/25 — **(2026-07-15) dibatalkan**, kembali ke 3 penilai seragam semua level (Kabag, Direktur Bidang, rekan sesama Kasi, 33/33/34, §5 revisi). **(2026-07-14)** Besaran pengurangan skor per aduan integritas tervalidasi = **flat per kejadian** sesuai `kpi_integrity_categories.deduction_value` (§10), bukan berjenjang. **(2026-07-14)** Bobot per-slot penilai (§5.4) disimpan di master table `kpi_evaluator_weights`, bukan hard-code (§10). **(2026-07-14)** Status "menunggu approval" pada `kpi_plans` = nilai enum baru `SUBMITTED`, bukan kolom timestamp terpisah (§10). **(2026-07-14)** Komentar approval/revisi (§14.5 sub-tab 4.3) disimpan di tabel riwayat `kpi_plan_reviews` (1 baris per putaran approve/revisi), bukan kolom tunggal (§10). **(2026-07-14)** Live Location "pejabat lihat sesama pejabat" (§14.4) = **seluruh pejabat se-Perumdam**, lintas bagian dan lintas level (job*level 1–3 saling lihat), **bukan** dibatasi satu direktorat seperti asumsi awal — plus switch ke mode "bawahan sendiri saja". **(2026-07-14, ronde 2)** Fase Working/self-assessment (§14.5) **otomatis** ikut penutupan `kpi_periods.status` DRAFT→EVALUATION oleh HRD — tidak ada tombol "ajukan" atau state terpisah per-pegawai; `self_assessment*\*`cukup`PUT`bebas selama periode masih DRAFT dan plan sudah`APPROVED`(§15.4). **(2026-07-14, ronde 2)**`committees`/`committee_members`**dihapus total** dari codebase (migration, model, tabel di DB) — lihat §10. **(2026-07-14, ronde 2)** Dedup harian aduan (§8.4) = **diterima semua, diabaikan diam-diam saat`KpiEvaluationService`menghitung skor** — bukan ditolak saat submit. **(2026-07-14, ronde 2)** Auth mobile = token Sanctum per device, tanpa refresh-token, pola sama dengan`POST /api/login` yang sudah ada. **(2026-07-15, dikonfirmasi eksplisit)** Direktur Utama **tidak pernah approve** rencana kinerja siapa pun, hanya menilai (4.4) — Kasi di-approve Kabag, Kabag di-approve Direktur Bidang, Dirut cuma dapat tab **4.4 Beri Penilaian**, tab **4.3 Approval** tidak muncul untuknya sama sekali.
+Sudah dikonfirmasi user: bobot 33/33/34 untuk Staf & Kabag-setara (§5.4); Penilai 2 tidak eskalasi saat Kasi kosong, tetap Kabag walau rangkap slot (§5.1–5.2); Apel Pagi (5%) hanya dihitung dari hari Senin (§7 poin 3); Integritas (20%) dipecah 8 sub-kategori skema pengurang (§7.1); "Koperasi" cukup diwakili `instansi = KOPKARTIRDA`, bukan `employment_status` terpisah; `PEGAWAI_80` = status transisi Koperasi → Tirta Daroy dengan gaji 80% (§6.1); `username` field terpisah dari `email`, login menerima email/NIK/username (§6, §10) — sudah diimplementasikan. **(2026-07-14)** Kasi sempat diubah jadi 4 penilai (Kabag, Direktur Bidang, Direktur Utama, rekan), bobot rata 25/25/25/25 — **(2026-07-15) dibatalkan**, kembali ke 3 penilai seragam semua level (Kabag, Direktur Bidang, rekan sesama Kasi, 33/33/34, §5 revisi). **(2026-07-14)** Besaran pengurangan skor per aduan integritas tervalidasi = **flat per kejadian** sesuai `kpi_integrity_categories.deduction_value` (§10), bukan berjenjang. **(2026-07-14)** Bobot per-slot penilai (§5.4) disimpan di master table `kpi_evaluator_weights`, bukan hard-code (§10). **(2026-07-14)** Status "menunggu approval" pada `kpi_plans` = nilai enum baru `SUBMITTED`, bukan kolom timestamp terpisah (§10). **(2026-07-14)** Komentar approval/revisi (§14.5 sub-tab 4.3) disimpan di tabel riwayat `kpi_plan_reviews` (1 baris per putaran approve/revisi), bukan kolom tunggal (§10). **(2026-07-14)** Live Location "pejabat lihat sesama pejabat" (§14.4) = **seluruh pejabat se-Perumdam**, lintas bagian dan lintas level (job*level 1–3 saling lihat), **bukan** dibatasi satu direktorat seperti asumsi awal — plus switch ke mode "bawahan sendiri saja". **(2026-07-14, ronde 2)** Fase Working/self-assessment (§14.5) **otomatis** ikut penutupan `kpi_periods.status` DRAFT→EVALUATION oleh HRD — tidak ada tombol "ajukan" atau state terpisah per-pegawai; `self_assessment*\*`cukup`PUT`bebas selama periode masih DRAFT dan plan sudah`APPROVED`(§15.4). **(2026-07-14, ronde 2)**`committees`/`committee_members`**dihapus total** dari codebase (migration, model, tabel di DB) — lihat §10. **(2026-07-14, ronde 2)** Dedup harian aduan (§8.4) = **diterima semua, diabaikan diam-diam saat`KpiEvaluationService`menghitung skor** — bukan ditolak saat submit. **(2026-07-14, ronde 2)** Auth mobile = token Sanctum per device, tanpa refresh-token, pola sama dengan`POST /api/login` yang sudah ada. **(2026-07-15, dikonfirmasi eksplisit)** Direktur Utama **tidak pernah approve** rencana kinerja siapa pun, hanya menilai (4.4) — Kasi di-approve Kabag, Kabag di-approve Direktur Bidang, Dirut cuma dapat tab **4.4 Beri Penilaian**, tab **4.3 Approval** tidak muncul untuknya sama sekali. **(2026-07-20)** Deduksi flat per aduan Pakaian Dinas tervalidasi (§7 poin 4) = **5 poin** (dari basis 100), bukan 20 seperti asumsi awal — `KpiEvaluationService::DEFAULT_PAKAIAN_DEDUCTION`.
 
 Semua poin pertanyaan terbuka §13 sudah selesai dikonfirmasi. Poin serupa untuk fitur **Izin** (Cuti/Sakit/Dinas Luar) — lihat §16.6.
 
@@ -665,6 +696,8 @@ Tiga jenis izin, workflow beda-beda, tapi tetap 1 tabel `leave_requests` (§10) 
 | **Cuti**       | HR (di panel admin)                                  | App **atau** HR manual (kertas) | Scan surat sudah di-acc Direktur (diupload HR saat approve, atau saat input manual) |
 | **Sakit**      | Atasan pertama (di app, bukan HR)                    | App saja                        | Surat dokter, **hanya wajib kalau > 1 hari**                                        |
 | **Dinas Luar** | Tidak ada approval — SPPD fisik sudah jadi otorisasi | HR manual saja (bukan pegawai)  | SPPD / surat pengantar (wajib)                                                      |
+
+**(Update 2026-07-20)** Hanya **Cuti** yang memotong `users.leave_balance`, sebesar hari kerja saja (Senin-Sabtu, Minggu tidak dihitung — §8.2). Sakit/Izin/Dinas Luar tidak menyentuh jatah cuti sama sekali (dikonfirmasi oleh catatan lama di baris ini: Izin "tidak memotong jatah cuti/gaji").
 
 ### 16.2. Cuti — Alur Hybrid Online/Offline
 

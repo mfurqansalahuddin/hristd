@@ -11,7 +11,8 @@ class DailyActivity extends Model
     ];
 
     protected $casts = [
-        'activity_date' => 'date',
+        // date:Y-m-d supaya JSON-nya '2026-07-17', bukan '2026-07-16T17:00:00Z' (geser -7 jam dari Asia/Jakarta).
+        'activity_date' => 'date:Y-m-d',
     ];
 
     public function user()

@@ -9,7 +9,9 @@ use App\Models\KpiFinalScore;
 use App\Models\KpiPeriod;
 use App\Models\KpiPlan;
 use App\Models\LeaveRequest;
+use App\Models\Location;
 use App\Models\User;
+use App\Services\EvaluationProgressService;
 use App\Services\EvaluatorResolutionService;
 use Illuminate\Http\Request;
 
@@ -19,7 +21,7 @@ use Illuminate\Http\Request;
  */
 class HomeController extends Controller
 {
-    public function index(Request $request, EvaluatorResolutionService $evaluatorResolutionService)
+    public function index(Request $request, EvaluatorResolutionService $evaluatorResolutionService, EvaluationProgressService $progress)
     {
         $user = $request->user();
         $period = KpiPeriod::current();
@@ -29,9 +31,20 @@ class HomeController extends Controller
             'kpi_phase' => $this->kpiPhase($user, $period),
             'last_month_score' => $this->lastMonthScore($user, $period),
             'attendance_today' => $this->attendanceToday($user),
-            'pending_evaluations' => $this->pendingEvaluations($user, $period, $evaluatorResolutionService),
-            'pending_sick_approvals' => $this->pendingSickApprovals($user, $evaluatorResolutionService),
+            'pending_evaluations' => $this->pendingEvaluations($user, $period, $evaluatorResolutionService, $progress),
+            'pending_leave_approvals' => $this->pendingLeaveApprovals($user, $evaluatorResolutionService),
+            'locations' => $this->locations(),
         ]);
+    }
+
+    /**
+     * Lokasi kantor (radius/poligon) untuk digambar di minimap Home + cek "di kantor / di luar kantor" (§8.1.1 plan.md).
+     *
+     * @return array<int, array{id: int, name: string, type: string, lat: float, long: float, radius_meters: ?int, polygon: ?array}>
+     */
+    private function locations(): array
+    {
+        return Location::forMinimap();
     }
 
     /** @return array{period: ?array, status: ?string, my_step: ?string} */
@@ -87,7 +100,7 @@ class HomeController extends Controller
             return 'EVALUATED';
         }
 
-        $expected = $approvedPlans->count() * 3;
+        $expected = $approvedPlans->count() * 2;
         $actual = KpiEvaluation::whereIn('kpi_plan_id', $approvedPlans->pluck('id'))->count();
 
         return $actual >= $expected ? 'EVALUATED' : 'WAITING_EVALUATION';
@@ -106,7 +119,7 @@ class HomeController extends Controller
         return $score ? (float) $score->grand_total_score : null;
     }
 
-    /** @return array{clocked_in: bool, clocked_out: bool} */
+    /** @return array{clocked_in: bool, clocked_out: bool, clock_in_time: ?string, clock_out_time: ?string} */
     private function attendanceToday(User $user): array
     {
         $today = Attendance::where('user_id', $user->id)->whereDate('date', now()->toDateString())->first();
@@ -114,37 +127,27 @@ class HomeController extends Controller
         return [
             'clocked_in' => (bool) $today?->clock_in,
             'clocked_out' => (bool) $today?->clock_out,
+            'clock_in_time' => $today?->clock_in?->format('H:i'),
+            'clock_out_time' => $today?->clock_out?->format('H:i'),
         ];
     }
 
-    /** @return array{peers: int, subordinates: int} */
-    private function pendingEvaluations(User $user, ?KpiPeriod $period, EvaluatorResolutionService $service): array
+    /** Jumlah evaluatee (Kinerja utk Penilai 1/2, Integritas utk ketiga slot, §5.4/§5.4b mobile-app.md) yang belum tuntas — 1 layar gabungan, 1 angka. */
+    private function pendingEvaluations(User $user, ?KpiPeriod $period, EvaluatorResolutionService $service, EvaluationProgressService $progress): int
     {
-        if (! $period) {
-            return ['peers' => 0, 'subordinates' => 0];
+        // Penilaian rekan/bawahan hanya berjalan selama fase EVALUATION (§isScoringOpen).
+        if (! $period || $period->status !== 'EVALUATION') {
+            return 0;
         }
 
-        $pending = $service->evaluateesFor($user, $period->id)->filter(function (array $entry) use ($user, $period) {
-            $plans = KpiPlan::where('user_id', $entry['evaluee']->id)->where('period_id', $period->id)->where('status', 'APPROVED')->get();
-
-            if ($plans->isEmpty()) {
-                return false;
-            }
-
-            $evaluatedCount = KpiEvaluation::whereIn('kpi_plan_id', $plans->pluck('id'))->where('evaluator_id', $user->id)->count();
-
-            return $evaluatedCount < $plans->count();
-        });
-
-        return [
-            'peers' => $pending->where('is_peer', true)->count(),
-            'subordinates' => $pending->where('is_peer', false)->count(),
-        ];
+        return $service->evaluateesFor($user, $period->id)
+            ->filter(fn (array $entry) => ! $progress->isFullyEvaluated($user, $entry['evaluee'], $entry['slot'], $period))
+            ->count();
     }
 
-    private function pendingSickApprovals(User $user, EvaluatorResolutionService $service): int
+    private function pendingLeaveApprovals(User $user, EvaluatorResolutionService $service): int
     {
-        return LeaveRequest::where('type', 'SAKIT')
+        return LeaveRequest::whereIn('type', ['SAKIT', 'IZIN'])
             ->where('status', 'PENDING')
             ->get()
             ->filter(function (LeaveRequest $leaveRequest) use ($user, $service) {

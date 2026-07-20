@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\LocationPinged;
 use App\Http\Controllers\Controller;
+use App\Models\Department;
+use App\Models\Location;
 use App\Models\UserCurrentLocation;
 use App\Services\LocationVisibilityService;
 use Illuminate\Http\Request;
@@ -12,6 +15,18 @@ use Illuminate\Http\Request;
  */
 class LocationController extends Controller
 {
+    /** Sub-filter dropdown untuk Direksi §4.1 — mobile tidak punya cara lain mendapat daftar Bagian. */
+    public function departments()
+    {
+        return response()->json(['data' => Department::select('id', 'name', 'type')->orderBy('name')->get()]);
+    }
+
+    /** Penanda lokasi kantor buat digambar di minimap Live Location, sama seperti Home. */
+    public function offices()
+    {
+        return response()->json(['data' => Location::forMinimap()]);
+    }
+
     public function ping(Request $request)
     {
         $data = $request->validate([
@@ -25,10 +40,14 @@ class LocationController extends Controller
             return response()->json(['ok' => true]);
         }
 
+        $now = now();
+
         UserCurrentLocation::updateOrCreate(
             ['user_id' => $request->user()->id],
-            ['lat' => $data['lat'], 'long' => $data['long'], 'last_updated_at' => now()]
+            ['lat' => $data['lat'], 'long' => $data['long'], 'last_updated_at' => $now]
         );
+
+        broadcast(new LocationPinged($request->user(), $data['lat'], $data['long'], $now->toIso8601String()));
 
         return response()->json(['ok' => true]);
     }
@@ -60,6 +79,7 @@ class LocationController extends Controller
             ->map(fn (UserCurrentLocation $location) => [
                 'user_id' => $location->user_id,
                 'name' => $location->user?->name,
+                'photo_url' => $location->user?->photoUrl(),
                 'lat' => (float) $location->lat,
                 'long' => (float) $location->long,
                 'last_updated_at' => $location->last_updated_at,

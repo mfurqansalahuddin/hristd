@@ -3,22 +3,25 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\DailyActivity;
 use App\Models\KpiEvaluation;
 use App\Models\KpiExtraCriterion;
 use App\Models\KpiExtraCriterionScore;
 use App\Models\KpiPeriod;
 use App\Models\KpiPlan;
 use App\Models\User;
+use App\Services\EvaluationProgressService;
 use App\Services\EvaluatorResolutionService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 /**
- * §14.5/§15.4 mobile-app.md sub-tab 5.4 — Beri Penilaian.
+ * §14.5/§15.4 mobile-app.md sub-tab 5.4 — Beri Penilaian (Kinerja + Integritas
+ * digabung 1 layar, 2026-07-20: PENILAI_3/rekan cuma kebagian Integritas).
  */
 class KpiEvaluationController extends Controller
 {
-    public function pending(Request $request, EvaluatorResolutionService $service)
+    public function pending(Request $request, EvaluatorResolutionService $service, EvaluationProgressService $progress)
     {
         $period = KpiPeriod::current();
 
@@ -27,16 +30,8 @@ class KpiEvaluationController extends Controller
         }
 
         $data = $service->evaluateesFor($request->user(), $period->id)
-            ->map(function (array $entry) use ($period, $request) {
+            ->map(function (array $entry) use ($period, $request, $progress) {
                 $plans = KpiPlan::where('user_id', $entry['evaluee']->id)->where('period_id', $period->id)->where('status', 'APPROVED')->get();
-                $evaluatedCount = KpiEvaluation::whereIn('kpi_plan_id', $plans->pluck('id'))->where('evaluator_id', $request->user()->id)->count();
-
-                $activeCriteria = KpiExtraCriterion::where('is_active', true)->pluck('id');
-                $criteriaScoredCount = KpiExtraCriterionScore::whereIn('kpi_extra_criterion_id', $activeCriteria)
-                    ->where('user_id', $entry['evaluee']->id)
-                    ->where('period_id', $period->id)
-                    ->where('evaluator_id', $request->user()->id)
-                    ->count();
 
                 return [
                     'user_id' => $entry['evaluee']->id,
@@ -44,8 +39,7 @@ class KpiEvaluationController extends Controller
                     'evaluator_role' => $entry['slot'],
                     'is_peer' => $entry['is_peer'],
                     'self_assessment_done' => $plans->isNotEmpty() && $plans->every(fn (KpiPlan $plan) => $plan->self_assessment_score !== null),
-                    'already_evaluated' => $plans->isNotEmpty() && $evaluatedCount >= $plans->count()
-                        && $criteriaScoredCount >= $activeCriteria->count(),
+                    'already_evaluated' => $progress->isFullyEvaluated($request->user(), $entry['evaluee'], $entry['slot'], $period),
                 ];
             })
             ->values();
@@ -78,10 +72,39 @@ class KpiEvaluationController extends Controller
         return response()->json(['data' => $plans, 'extra_criteria' => $extraCriteria]);
     }
 
+    /**
+     * Logbook evaluee dibatasi bulan periode — bukti kerja untuk penilai (fase
+     * Working/Evaluation). `kpi_plan_id` opsional: diisi = logbook 1 target
+     * tertentu (tombol "Logbook terkait pekerjaan ini" per item), kosong =
+     * seluruh logbook evaluee di periode ini (kolom di bawah header Beri
+     * Penilaian, §5.4/§5.4b mobile-app.md). Semua 3 slot boleh akses (termasuk
+     * PENILAI_3/rekan yang cuma menilai Integritas — tetap butuh konteks logbook).
+     */
+    public function logbook(Request $request, User $user, EvaluatorResolutionService $service)
+    {
+        $period = KpiPeriod::current();
+        $this->authorizeAnySlot($request->user(), $user, $period, $service);
+
+        $data = $request->validate(['kpi_plan_id' => ['nullable', 'integer']]);
+
+        $activities = DailyActivity::where('user_id', $user->id)
+            ->whereYear('activity_date', $period->year)
+            ->whereMonth('activity_date', $period->month)
+            ->when(! empty($data['kpi_plan_id']), function ($query) use ($data, $user, $period) {
+                $plan = KpiPlan::where('id', $data['kpi_plan_id'])->where('user_id', $user->id)->where('period_id', $period->id)->firstOrFail();
+                $query->where('kpi_plan_id', $plan->id);
+            })
+            ->orderByDesc('activity_date')
+            ->get();
+
+        return response()->json(['data' => $activities]);
+    }
+
     public function store(Request $request, User $user, EvaluatorResolutionService $service)
     {
         $period = KpiPeriod::current();
         $slot = $this->authorizeEvaluator($request->user(), $user, $period, $service);
+        abort_unless($period->isScoringOpen(), 422, 'Periode KPI sedang tidak dalam masa penilaian.');
 
         $data = $request->validate([
             'kpi_plan_id' => ['required', 'integer', 'exists:kpi_plans,id'],
@@ -103,6 +126,7 @@ class KpiEvaluationController extends Controller
     {
         $period = KpiPeriod::current();
         $slot = $this->authorizeEvaluator($request->user(), $user, $period, $service);
+        abort_unless($period->isScoringOpen(), 422, 'Periode KPI sedang tidak dalam masa penilaian.');
 
         $data = $request->validate([
             'kpi_extra_criterion_id' => ['required', 'integer', 'exists:kpi_extra_criteria,id'],
@@ -123,8 +147,18 @@ class KpiEvaluationController extends Controller
         return response()->json($score);
     }
 
-    /** @return string slot penilai (PENILAI_1..3) milik $evaluator terhadap $subject */
+    /** @return string slot penilai (PENILAI_1/2 saja) milik $evaluator terhadap $subject — Kinerja, PENILAI_3 ditolak. */
     private function authorizeEvaluator(User $evaluator, User $subject, ?KpiPeriod $period, EvaluatorResolutionService $service): string
+    {
+        $slot = $this->authorizeAnySlot($evaluator, $subject, $period, $service);
+
+        abort_if($slot === 'PENILAI_3', 403, 'Rekan sejawat tidak lagi menilai Kinerja.');
+
+        return $slot;
+    }
+
+    /** @return string slot penilai (PENILAI_1..3) milik $evaluator terhadap $subject */
+    private function authorizeAnySlot(User $evaluator, User $subject, ?KpiPeriod $period, EvaluatorResolutionService $service): string
     {
         if (! $period) {
             throw ValidationException::withMessages(['period_id' => ['Tidak ada periode KPI berjalan.']]);

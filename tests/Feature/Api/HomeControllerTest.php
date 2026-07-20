@@ -87,7 +87,27 @@ test('last_month_score terisi kalau kpi_final_scores periode -1 sudah ada', func
         ->assertJsonPath('last_month_score', 88);
 });
 
-test('pending_sick_approvals menghitung bawahan langsung dengan pengajuan sakit PENDING', function () {
+test('pending_evaluations nol selama fase DRAFT, terisi setelah EVALUATION', function () {
+    $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN']);
+    $seksi = Department::create(['name' => 'Seksi A', 'type' => 'SEKSI', 'parent_department_id' => $bagian->id]);
+    $kasi = User::factory()->create(['job_level' => 3, 'department_id' => $seksi->id]);
+    $staf = User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id]);
+
+    $draft = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'DRAFT']);
+    KpiPlan::create(['user_id' => $staf->id, 'period_id' => $draft->id, 'target_description' => 'A', 'weight' => 30, 'status' => 'APPROVED']);
+
+    $this->actingAs($kasi, 'sanctum')->getJson('/api/home')
+        ->assertOk()
+        ->assertJsonPath('pending_evaluations', 0);
+
+    $draft->update(['status' => 'EVALUATION']);
+
+    $this->actingAs($kasi, 'sanctum')->getJson('/api/home')
+        ->assertOk()
+        ->assertJsonPath('pending_evaluations', 1);
+});
+
+test('pending_leave_approvals menghitung bawahan langsung dengan pengajuan sakit/izin PENDING', function () {
     KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'DRAFT']);
     $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN']);
     $seksi = Department::create(['name' => 'Seksi A', 'type' => 'SEKSI', 'parent_department_id' => $bagian->id]);
@@ -96,10 +116,14 @@ test('pending_sick_approvals menghitung bawahan langsung dengan pengajuan sakit 
 
     LeaveRequest::create([
         'user_id' => $staf->id, 'type' => 'SAKIT', 'start_date' => now()->toDateString(), 'end_date' => now()->toDateString(),
-        'status' => 'PENDING', 'source' => 'APP',
+        'reason' => 'Demam', 'status' => 'PENDING', 'source' => 'APP',
+    ]);
+    LeaveRequest::create([
+        'user_id' => $staf->id, 'type' => 'IZIN', 'start_date' => now()->toDateString(), 'end_date' => now()->toDateString(),
+        'reason' => 'Urusan keluarga', 'status' => 'PENDING', 'source' => 'APP',
     ]);
 
     $this->actingAs($kasi, 'sanctum')->getJson('/api/home')
         ->assertOk()
-        ->assertJsonPath('pending_sick_approvals', 1);
+        ->assertJsonPath('pending_leave_approvals', 2);
 });

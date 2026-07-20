@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DailyActivity;
 use App\Models\KpiPlan;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 /** §14.6/§15.6 mobile-app.md — Logbook (§8.5 plan.md), input dibatasi H-2 mundur. */
 class LogbookController extends Controller
@@ -47,5 +48,47 @@ class LogbookController extends Controller
         ]);
 
         return response()->json($activity, 201);
+    }
+
+    public function update(Request $request, DailyActivity $activity)
+    {
+        abort_unless($activity->user_id === $request->user()->id, 403);
+        abort_unless($this->withinEditWindow($activity), 422, 'Batas edit logbook sudah lewat.');
+
+        $data = $request->validate([
+            'description' => ['required', 'string'],
+            'photo' => ['nullable', 'image', 'max:5120'],
+        ]);
+
+        if ($request->hasFile('photo')) {
+            if ($activity->photo_path) {
+                Storage::disk('public')->delete($activity->photo_path);
+            }
+            $activity->photo_path = $request->file('photo')->store('logbook', 'public');
+        }
+
+        $activity->description = $data['description'];
+        $activity->save();
+
+        return response()->json($activity);
+    }
+
+    public function destroy(Request $request, DailyActivity $activity)
+    {
+        abort_unless($activity->user_id === $request->user()->id, 403);
+        abort_unless($this->withinEditWindow($activity), 422, 'Batas edit logbook sudah lewat.');
+
+        if ($activity->photo_path) {
+            Storage::disk('public')->delete($activity->photo_path);
+        }
+        $activity->delete();
+
+        return response()->json(null, 204);
+    }
+
+    /** Sama seperti batas input H-2: entry hanya bisa diedit/dihapus selagi activity_date masih >= H-2. */
+    private function withinEditWindow(DailyActivity $activity): bool
+    {
+        return $activity->activity_date->greaterThanOrEqualTo(now()->subDays(2)->startOfDay());
     }
 }

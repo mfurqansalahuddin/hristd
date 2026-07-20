@@ -128,7 +128,63 @@
     </div>
 
     <div class="mb-6">
-        <x-common.component-card title="Tambah Kategori Pengurang Integritas" desc="Tiap aduan atasan tervalidasi pada kategori ini mengurangi skor Integritas sebesar nilai pengurang.">
+        <x-common.component-card title="Bobot Sumber Integritas" desc="Skor Integritas digabung dari 4 sumber ini (masing-masing dihitung sendiri, lalu dirata-rata tertimbang). Total harus 100%.">
+            <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+                <div class="max-w-full overflow-x-auto custom-scrollbar">
+                    <table class="w-full min-w-[500px]">
+                        <thead>
+                            <tr class="border-b border-gray-100 dark:border-gray-800">
+                                <th class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Sumber</p></th>
+                                <th class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Bobot</p></th>
+                                <th class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Aksi</p></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($sourceWeightRows as $source)
+                                <tr wire:key="source-{{ $source->id }}" class="border-b border-gray-100 dark:border-gray-800">
+                                    <td class="px-5 py-4 sm:px-6">
+                                        <p class="text-sm font-medium text-gray-800 dark:text-white/90">{{ $source->label() }}</p>
+                                    </td>
+                                    <td class="px-5 py-4 sm:px-6">
+                                        <div class="relative w-24">
+                                            <input type="number" min="0" max="100" wire:model.live="sourceWeightEdits.{{ $source->id }}.weight" value="{{ $sourceWeightEdits[$source->id]['weight'] }}"
+                                                class="dark:bg-dark-900 shadow-theme-xs h-9 w-full rounded-lg border border-gray-300 bg-transparent pr-6 pl-3 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90" />
+                                            <span class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-sm text-gray-400">%</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-5 py-4 sm:px-6">
+                                        <button type="button" wire:click="updateSourceWeight({{ $source->id }})"
+                                            @disabled(! $this->isSourceWeightDirty($source->id))
+                                            class="text-sm {{ $this->isSourceWeightDirty($source->id) ? 'text-brand-500 hover:underline' : 'text-gray-300 dark:text-gray-600 cursor-not-allowed' }}">
+                                            Simpan
+                                        </button>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" class="px-5 py-4 sm:px-6">
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                                        Total bobot:
+                                        <span class="text-base font-semibold {{ $this->sourceWeightsTotal() === 100 ? 'text-success-500' : 'text-error-500' }}">
+                                            {{ $this->sourceWeightsTotal() }}%
+                                        </span>
+                                        @if ($this->sourceWeightsTotal() !== 100)
+                                            <span class="text-error-500"> — harus 100%</span>
+                                        @endif
+                                    </p>
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+        </x-common.component-card>
+    </div>
+
+    <div class="mb-6">
+        <x-common.component-card title="Tambah Kategori Pengurang Integritas" desc="Tiap temuan tervalidasi dari salah satu dari 4 sumber Integritas pada kategori ini mengurangi skor kategori tsb sampai 0.">
             <form wire:submit="storeIntegrityCategory" class="flex flex-wrap items-end gap-4">
                 <div class="flex-1 min-w-[200px]">
                     <x-form.input name="newName" wire:model="newName" label="Nama Kategori" required />

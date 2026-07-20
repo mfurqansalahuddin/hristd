@@ -89,3 +89,21 @@ test('bukan atasan pertama ditolak saat minta tambah tugas', function () {
         'comment' => 'Coba minta',
     ])->assertStatus(403);
 });
+
+test('approve ditolak kalau periode sudah bukan DRAFT', function () {
+    $period = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'EVALUATION']);
+    ['kasi' => $kasi, 'staf' => $staf] = makeStafDenganAtasanUntukApproval();
+    KpiPlan::create(['user_id' => $staf->id, 'period_id' => $period->id, 'target_description' => 'A', 'weight' => 20, 'status' => 'SUBMITTED']);
+
+    $this->actingAs($kasi, 'sanctum')->postJson("/api/kpi/approvals/{$staf->id}", ['action' => 'APPROVED'])
+        ->assertStatus(422);
+});
+
+test('request-task ditolak kalau periode sudah bukan DRAFT', function () {
+    KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'EVALUATION']);
+    ['kasi' => $kasi, 'staf' => $staf] = makeStafDenganAtasanUntukApproval();
+
+    $this->actingAs($kasi, 'sanctum')->postJson("/api/kpi/approvals/{$staf->id}/request-task", [
+        'comment' => 'Coba minta',
+    ])->assertStatus(422);
+});

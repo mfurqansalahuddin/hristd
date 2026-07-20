@@ -4,6 +4,7 @@ use App\Livewire\Admin\KpiCategoriesPanel;
 use App\Models\KpiComponentWeight;
 use App\Models\KpiExtraCriterion;
 use App\Models\KpiIntegrityCategory;
+use App\Models\KpiIntegritySourceWeight;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -122,6 +123,23 @@ test('deskripsi komponen tetap bisa diisi manual dan baru tersimpan setelah teka
 
     expect($kinerja->fresh()->description)->toBe('Catatan manual dari admin')
         ->and($component->instance()->isComponentDirty($kinerja->id))->toBeFalse();
+});
+
+test('bobot sumber integritas seed 25/25/25/25, total 100, bisa diedit satu-per-satu', function () {
+    $penilai1 = KpiIntegritySourceWeight::where('source', 'PENILAI_1')->first();
+
+    $component = Livewire::test(KpiCategoriesPanel::class)
+        ->assertSee('100%'); // total 4 sumber default 25+25+25+25
+
+    expect($component->instance()->sourceWeightsTotal())->toBe(100)
+        ->and($component->instance()->isSourceWeightDirty($penilai1->id))->toBeFalse();
+
+    $component->set("sourceWeightEdits.{$penilai1->id}.weight", 40);
+    expect($component->instance()->isSourceWeightDirty($penilai1->id))->toBeTrue();
+
+    $component->call('updateSourceWeight', $penilai1->id);
+    expect($component->instance()->isSourceWeightDirty($penilai1->id))->toBeFalse()
+        ->and($penilai1->fresh()->weight)->toBe(40);
 });
 
 test('kriteria tambahan baru langsung ikut ke total gabungan, deskripsi wajib diisi', function () {

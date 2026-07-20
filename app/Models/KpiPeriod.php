@@ -21,6 +21,24 @@ class KpiPeriod extends Model
         return self::where('year', $year)->where('month', $month)->first();
     }
 
+    /** Rencana kerja (create/update/submit) + approval atasan pertama dibuka. */
+    public function isPlanningOpen(): bool
+    {
+        return $this->status === 'DRAFT';
+    }
+
+    /** Penilaian evaluator dibuka. */
+    public function isScoringOpen(): bool
+    {
+        return $this->status === 'EVALUATION';
+    }
+
+    /** Self-assessment dibuka: fase Working (rencana terkunci, penilai belum bisa menilai) dan Evaluation. */
+    public function isSelfAssessmentOpen(): bool
+    {
+        return in_array($this->status, ['WORKING', 'EVALUATION'], true);
+    }
+
     public function kpiPlans()
     {
         return $this->hasMany(KpiPlan::class, 'period_id');

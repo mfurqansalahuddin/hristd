@@ -49,6 +49,7 @@ class KpiApprovalController extends Controller
     {
         $period = KpiPeriod::current();
         $this->authorizeFirstSupervisor($request->user(), $user, $period, $service);
+        abort_unless($period->isPlanningOpen(), 422, 'Periode KPI sedang tidak dalam masa pengajuan rencana kerja.');
 
         $data = $request->validate([
             'action' => ['required', 'in:APPROVED,REVISION_REQUESTED'],
@@ -78,6 +79,7 @@ class KpiApprovalController extends Controller
     {
         $period = KpiPeriod::current();
         $this->authorizeFirstSupervisor($request->user(), $user, $period, $service);
+        abort_unless($period->isPlanningOpen(), 422, 'Periode KPI sedang tidak dalam masa pengajuan rencana kerja.');
 
         $data = $request->validate(['comment' => ['required', 'string']]);
 

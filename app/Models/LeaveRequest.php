@@ -10,6 +10,8 @@ class LeaveRequest extends Model
 
     public const TYPE_SAKIT = 'SAKIT';
 
+    public const TYPE_IZIN = 'IZIN';
+
     public const TYPE_DINAS_LUAR = 'DINAS_LUAR';
 
     public const SOURCE_APP = 'APP';

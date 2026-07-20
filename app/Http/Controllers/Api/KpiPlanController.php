@@ -34,9 +34,13 @@ class KpiPlanController extends Controller
     {
         $data = $request->validate([
             'period_id' => ['required', 'integer', 'exists:kpi_periods,id'],
+            'name' => ['required', 'string'],
             'target_description' => ['required', 'string'],
             'weight' => ['required', 'numeric', 'min:1', 'max:50'],
         ]);
+
+        $period = KpiPeriod::findOrFail($data['period_id']);
+        abort_unless($period->isPlanningOpen(), 422, 'Periode KPI sedang tidak dalam masa pengajuan rencana kerja.');
 
         $user = $request->user();
         $usedWeight = KpiPlan::where('user_id', $user->id)->where('period_id', $data['period_id'])->sum('weight');
@@ -48,6 +52,7 @@ class KpiPlanController extends Controller
         $plan = KpiPlan::create([
             'user_id' => $user->id,
             'period_id' => $data['period_id'],
+            'name' => $data['name'],
             'target_description' => $data['target_description'],
             'weight' => $data['weight'],
             'status' => 'DRAFT',
@@ -60,8 +65,10 @@ class KpiPlanController extends Controller
     {
         abort_unless($plan->user_id === $request->user()->id, 403);
         abort_unless($plan->status === 'DRAFT', 422, 'Hanya rencana berstatus DRAFT yang bisa diedit.');
+        abort_unless($plan->period->isPlanningOpen(), 422, 'Periode KPI sedang tidak dalam masa pengajuan rencana kerja.');
 
         $data = $request->validate([
+            'name' => ['required', 'string'],
             'target_description' => ['required', 'string'],
             'weight' => ['required', 'numeric', 'min:1', 'max:50'],
         ]);
@@ -80,9 +87,23 @@ class KpiPlanController extends Controller
         return response()->json($plan->fresh());
     }
 
+    public function destroy(Request $request, KpiPlan $plan)
+    {
+        abort_unless($plan->user_id === $request->user()->id, 403);
+        abort_unless($plan->status === 'DRAFT', 422, 'Hanya rencana berstatus DRAFT yang bisa dihapus.');
+        abort_unless($plan->period->isPlanningOpen(), 422, 'Periode KPI sedang tidak dalam masa pengajuan rencana kerja.');
+
+        $plan->delete();
+
+        return response()->json(null, 204);
+    }
+
     public function submit(Request $request)
     {
         $data = $request->validate(['period_id' => ['required', 'integer']]);
+
+        $period = KpiPeriod::find($data['period_id']);
+        abort_unless($period?->isPlanningOpen(), 422, 'Periode KPI sedang tidak dalam masa pengajuan rencana kerja.');
 
         $user = $request->user();
         $plans = KpiPlan::where('user_id', $user->id)->where('period_id', $data['period_id'])->where('status', 'DRAFT');
@@ -100,6 +121,7 @@ class KpiPlanController extends Controller
     {
         abort_unless($plan->user_id === $request->user()->id, 403);
         abort_unless($plan->status === 'APPROVED', 422, 'Rencana kerja belum disetujui.');
+        abort_unless($plan->period->isSelfAssessmentOpen(), 422, 'Periode KPI sedang tidak dalam masa self-assessment.');
 
         $data = $request->validate([
             'self_assessment_score' => ['required', 'integer', 'min:0', 'max:100'],
@@ -121,7 +143,7 @@ class KpiPlanController extends Controller
     }
 
     /**
-     * Salin target_description+weight dari periode sebelumnya (§13 diskusi
+     * Salin name+target_description+weight dari periode sebelumnya (§13 diskusi
      * 2026-07-16) — untuk pekerjaan yang polanya sama tiap bulan (mis. catat
      * meter), supaya tidak input ulang dari nol. Status selalu fresh DRAFT,
      * self-assessment tidak ikut disalin.
@@ -132,6 +154,7 @@ class KpiPlanController extends Controller
 
         $user = $request->user();
         $period = KpiPeriod::findOrFail($data['period_id']);
+        abort_unless($period->isPlanningOpen(), 422, 'Periode KPI sedang tidak dalam masa pengajuan rencana kerja.');
 
         if (KpiPlan::where('user_id', $user->id)->where('period_id', $period->id)->exists()) {
             throw ValidationException::withMessages(['period_id' => ['Sudah ada rencana kerja periode ini, tidak bisa disalin.']]);
@@ -148,6 +171,7 @@ class KpiPlanController extends Controller
         $previousPlans->each(fn (KpiPlan $previous) => KpiPlan::create([
             'user_id' => $user->id,
             'period_id' => $period->id,
+            'name' => $previous->name,
             'target_description' => $previous->target_description,
             'weight' => $previous->weight,
             'status' => 'DRAFT',

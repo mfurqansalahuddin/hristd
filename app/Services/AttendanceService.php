@@ -4,13 +4,23 @@ namespace App\Services;
 
 use App\Models\Attendance;
 use App\Models\LeaveRequest;
+use Carbon\Carbon;
 use Carbon\CarbonPeriod;
+use Illuminate\Support\Collection;
 
 class AttendanceService
 {
+    /** Hari kerja (Senin-Sabtu, Minggu dilewati) dalam rentang tanggal — dipakai kuota cuti dan (via KpiEvaluationService) rasio kehadiran bulanan. */
+    public static function workingDaysBetween(Carbon $start, Carbon $end): Collection
+    {
+        return collect(CarbonPeriod::create($start, $end))->filter(fn ($date) => ! $date->isSunday())->values();
+    }
+
     /**
      * Suntikkan kehadiran 100% (status CUTI/SAKIT/DINAS_LUAR) untuk seluruh
-     * rentang tanggal cuti yang telah disahkan HRD.
+     * rentang tanggal cuti yang telah disahkan HRD. Untuk CUTI, jatah cuti
+     * (`leave_balance`) dipotong sebesar hari kerja saja (Minggu tidak
+     * dihitung) — Izin/Sakit/Dinas Luar tidak memotong jatah (§16.1).
      */
     public function injectAttendanceForApprovedLeave(LeaveRequest $leaveRequest): void
     {
@@ -19,6 +29,11 @@ class AttendanceService
                 ['user_id' => $leaveRequest->user_id, 'date' => $date->toDateString()],
                 ['status' => $leaveRequest->type, 'supervisor_approval' => 'APPROVED']
             );
+        }
+
+        if ($leaveRequest->type === LeaveRequest::TYPE_CUTI) {
+            $workingDays = self::workingDaysBetween($leaveRequest->start_date, $leaveRequest->end_date)->count();
+            $leaveRequest->user->decrement('leave_balance', $workingDays);
         }
     }
 }

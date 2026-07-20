@@ -16,7 +16,7 @@ use Illuminate\Http\Request;
  */
 class KpiFinalScoreController extends Controller
 {
-    private const HIDDEN_STATUSES = ['DRAFT', 'EVALUATION'];
+    private const HIDDEN_STATUSES = ['DRAFT', 'WORKING', 'EVALUATION'];
 
     public function show(Request $request)
     {

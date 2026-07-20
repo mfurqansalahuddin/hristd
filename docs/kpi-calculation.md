@@ -28,18 +28,22 @@ per target (total bobot ≤ 50, dikunci HRD saat masa pengajuan ditutup).
 Rencana ini harus di-approve atasan pertama dulu (`kpi_plan_reviews`) sebelum
 masuk fase "Working".
 
-Nilai akhir kinerja **bukan dari 1 orang** — dihitung dari 3 **penilai**,
-seragam jumlahnya di semua level jabatan (`job_level`), bobot disimpan di
-master `kpi_evaluator_weights`:
+Nilai akhir kinerja **bukan dari 1 orang** — dihitung dari **Penilai 1 & 2**
+(update 2026-07-20: Penilai 3/rekan sejawat tidak lagi ikut menilai Kinerja,
+dialihkan penuh ke Integritas — lihat §5), seragam jumlahnya di semua level
+jabatan (`job_level`), bobot disimpan di master `kpi_evaluator_weights`:
 
-| Level | Penilai 1 | Penilai 2 | Penilai 3 |
-|---|---|---|---|
-| Staf | Kasi — 33% | Kabag — 33% | Rekan seksi — 34% |
-| Kasi | Kabag — 33% | Direktur Bidang — 33% | Rekan sesama Kasi — 34% |
-| Kabag-setara | Direktur Bidang — 33% | Direktur Utama — 33% | Rekan sesama Kabag — 34% |
+| Level | Penilai 1 | Penilai 2 |
+|---|---|---|
+| Staf | Kasi — 50% | Kabag — 50% |
+| Kasi | Kabag — 50% | Direktur Bidang — 50% |
+| Kabag-setara | Direktur Bidang — 50% | Direktur Utama — 50% |
 
-Kasi sempat dinilai 4 orang (ditambah Direktur Utama, 25/25/25/25) tapi
-dibatalkan — kembali ke 3 penilai seperti di atas.
+Penilai 3 tetap dihitung oleh `EvaluatorResolutionService` (dipakai untuk
+Integritas, §5) tapi bobotnya di `kpi_evaluator_weights` diset 0 untuk Kinerja
+— baris tidak dihapus, cuma tidak berkontribusi. Riwayat: sebelum 2026-07-20
+ketiga slot menilai Kinerja seragam 33/33/34; sebelum itu lagi Kasi sempat
+dinilai 4 orang (25/25/25/25) tapi dibatalkan.
 
 Tiap penilai kasih skor per target di `kpi_evaluations`. Skor akhir komponen
 Kinerja = jumlah **(skor penilai × bobot slot penilai)**, lalu dikonversi ke
@@ -105,6 +109,15 @@ Kalau **tidak** disetujui (`status=REJECTED` atau masih `PENDING`), tidak ada
 baris `attendances` yang diinjeksi — hari itu tetap terhitung absen kalau
 pegawai memang tidak clock-in.
 
+**(Update 2026-07-20) Ini terpisah dari kuota `users.leave_balance`.**
+Khusus tipe CUTI, `injectAttendanceForApprovedLeave()` juga memotong
+`leave_balance` — tapi sebesar **hari kerja saja** (Senin-Sabtu,
+`AttendanceService::workingDaysBetween()`), bukan seluruh rentang kalender
+di atas. Jadi cuti 4 hari kalender yang mencakup 1 hari Minggu memotong
+jatah cuti 3, walau `attendances` tetap terisi untuk keempat harinya
+(termasuk Minggu — harmless untuk skor kehadiran karena rasio di-cap 1).
+Sakit/Izin/Dinas Luar tidak memotong `leave_balance` sama sekali.
+
 ---
 
 ## 3. Apel Pagi (5%)
@@ -134,10 +147,23 @@ bukan ditolak saat submit).
 
 ## 5. Integritas (20%)
 
-Beda dari Pakaian Dinas: **hanya atasan yang boleh mengadu tentang
-bawahannya** (dihitung via hierarki §5, sama seperti resolusi penilai),
-bukan siapa saja. Wajib deskripsi + pilih 1 dari 8 sub-kategori berikut
-(`kpi_integrity_categories`), tiap kategori mulai dari skor penuh:
+**(Revisi 2026-07-20)** Dulu 1 sumber (aduan atasan langsung saja). Kini
+digabung dari **4 sumber berbobot** (default 25/25/25/25, master
+`kpi_integrity_source_weights`, admin-editable):
+
+1. **Penilai 1**, **Penilai 2**, **Penilai 3** (rekan seksi acak — dibebaskan
+   dari Kinerja, §1) — masing-masing **wajib** mereview tiap pegawai yang
+   jadi tanggung jawabnya, per periode, lewat `kpi_integrity_evaluations`.
+   Untuk tiap satu dari 8 sub-kategori (tabel di bawah), evaluator memilih
+   **BIARIN** (tidak ada temuan) atau **KURANGIN** (ada temuan) — memilih
+   KURANGIN mewajibkan `description` + `photo`.
+2. **Aduan Perusahaan** — siapa saja di seluruh Perumda boleh melapor (bukan
+   lagi dikunci ke atasan langsung), lewat `violation_reports` category
+   INTEGRITAS seperti model lama, divalidasi lewat panel admin **Validasi
+   Aduan**.
+
+Tiap sumber dihitung skornya **sendiri-sendiri** (0-100) dengan formula yang
+sama, lalu digabung berbobot:
 
 | Skor Maks | Kategori |
 |---|---|
@@ -150,34 +176,43 @@ bukan siapa saja. Wajib deskripsi + pilih 1 dari 8 sub-kategori berikut
 | 10 | Inisiatif |
 | 10 | Tugas Tambahan |
 
-Tiap aduan tervalidasi mengurangi skor kategori terkait sebesar
-`kpi_integrity_categories.deduction_value` — **flat per kejadian**, bukan
-berjenjang (makin sering dilaporkan, potongannya sama besar tiap kali, bukan
-makin besar). Skor tidak bisa minus (floor 0). Dedup harian sama seperti
-Pakaian Dinas.
+Untuk 1 sumber: tiap kategori mulai dari skor penuh (`deduction_value`-nya
+sendiri). Temuan/KURANGIN tervalidasi dari sumber itu di kategori tsb
+men-nol-kan kategori itu **untuk sumber itu saja** (floor 0, tidak minus,
+flat per kejadian — bukan berjenjang, tidak menyebar ke 3 sumber lain).
+Khusus sumber Aduan Perusahaan, dedup harian tetap berlaku (kejadian sama,
+orang sama, hari sama → dihitung 1×).
 
 ```
-skor integritas = Σ (skor kategori setelah dikurangi, floor 0)   // dari total maks 100
-                 dikonversi proporsional ke bobot 20%
+skor 1 sumber   = Σ (skor kategori tersisa untuk sumber itu, floor 0)   // maks 100
+skor integritas = Σ (skor sumber × bobot sumber / 100)                  // rata-rata tertimbang 4 sumber
+                  dikonversi proporsional ke bobot 20%
 ```
+
+Pegawai yang belum direview evaluator tertentu di periode berjalan
+dihitung skor penuh (100) untuk sumber itu — sama seperti kategori yang
+belum pernah dilaporkan, bukan diblokir/dianggap 0.
 
 ---
 
-## Ringkasan alur "aduan" (Pakaian Dinas vs Integritas)
+## Ringkasan alur "aduan" (Pakaian Dinas vs Integritas — sumber Aduan Perusahaan)
 
-Satu tabel `violation_reports`, dibedakan kolom `category`:
+Satu tabel `violation_reports`, dibedakan kolom `category`. **(Update
+2026-07-20)** Untuk Integritas, tabel ini sekarang cuma jadi salah satu dari
+4 sumber ("Aduan Perusahaan") — Penilai 1/2/3 pindah ke `kpi_integrity_evaluations`
+(§5), bukan lagi lewat `violation_reports`.
 
-| | Pakaian Dinas | Integritas |
+| | Pakaian Dinas | Integritas (sumber Aduan Perusahaan) |
 |---|---|---|
-| Siapa boleh lapor | Siapa saja | Hanya atasan langsung ke bawahan |
+| Siapa boleh lapor | Siapa saja | Siapa saja (dulu terkunci ke atasan langsung, sekarang terbuka) |
 | Wajib foto? | Ya | Tidak (wajib deskripsi + pilih 1 dari 8 kategori) |
-| Validasi | Atasan langsung terlapor | Atasan langsung terlapor |
-| Efek ke skor | Potong komponen Pakaian Dinas (5%) | Potong salah satu dari 8 sub-kategori Integritas (20%) |
+| Validasi | Panel admin **Validasi Aduan** | Panel admin **Validasi Aduan** (dulu atasan langsung terlapor per-laporan) |
+| Efek ke skor | Potong komponen Pakaian Dinas (5%) | Potong kategori terkait, hanya untuk sumber "Aduan Perusahaan" (1 dari 4 sumber Integritas) |
 
 Form input aduan di rencana mobile ada di §14.5 sub-tab "Aduan Disiplin
 Pakaian & Integritas" — dropdown nama dicari, kalau kategori dipilih
-Integritas maka daftar sub-kategori (8 di atas) baru muncul dan sistem
-mengecek dulu apakah pelapor memang atasan langsung terlapor.
+Integritas maka daftar sub-kategori (8 di atas) baru muncul. Server tidak
+lagi mengecek relasi atasan-bawahan (2026-07-20).
 
 ---
 

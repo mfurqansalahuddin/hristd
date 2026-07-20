@@ -43,11 +43,12 @@
                             <select wire:model.live="status"
                                 class="dark:bg-dark-900 shadow-theme-xs w-full rounded-lg border border-gray-300 bg-transparent px-2 py-1.5 text-xs text-gray-800 dark:border-gray-700 dark:text-white/90">
                                 <option value="">- Semua -</option>
-                                @foreach (['DRAFT', 'EVALUATION', 'DISPUTE', 'CLOSED'] as $option)
+                                @foreach (['DRAFT', 'WORKING', 'EVALUATION', 'DISPUTE', 'CLOSED'] as $option)
                                     <option value="{{ $option }}">{{ $option }}</option>
                                 @endforeach
                             </select>
                         </x-common.data-table.th>
+                        <x-common.data-table.th label="Progres" />
                         <x-common.data-table.th label="Ubah Status" />
                     </tr>
                 </thead>
@@ -56,11 +57,34 @@
                         <tr wire:key="kpi-period-{{ $period->id }}" class="border-b border-gray-100 dark:border-gray-800">
                             <td class="px-5 py-4 sm:px-6"><p class="text-gray-800 text-theme-sm dark:text-white/90">{{ $period->month }}/{{ $period->year }}</p></td>
                             <td class="px-5 py-4 sm:px-6"><x-ui.badge color="primary">{{ $period->status }}</x-ui.badge></td>
+                            <td class="px-5 py-4 sm:px-6 text-theme-sm text-gray-600 dark:text-gray-400">
+                                @if ($period->status === 'DRAFT')
+                                    @php($s = $draftStats[$period->id] ?? ['belum' => 0, 'menunggu' => 0, 'approved' => 0])
+                                    <p>Belum mengisi: {{ $s['belum'] }}</p>
+                                    <p>Menunggu approval: {{ $s['menunggu'] }}</p>
+                                    <p>Sudah di-approve: {{ $s['approved'] }}</p>
+                                    @if ($s['belum'] === 0)
+                                        <p class="text-gray-400 italic dark:text-gray-500">Siap pindah ke fase Working</p>
+                                    @endif
+                                @elseif (in_array($period->status, ['EVALUATION', 'DISPUTE'], true))
+                                    @php($s = $evaluationStats[$period->id] ?? ['lengkap' => 0, 'belum' => 0])
+                                    <p>Sudah dinilai lengkap: {{ $s['lengkap'] }}</p>
+                                    <p>Belum: {{ $s['belum'] }}</p>
+                                @elseif ($period->status === 'CLOSED')
+                                    <div class="flex flex-wrap gap-1">
+                                        @foreach (\App\Models\KpiFinalScore::PREDIKAT_COLORS as $label => $color)
+                                            <x-ui.badge color="{{ $color }}" size="sm">{{ $label }}: {{ $closedStats[$period->id][$label] ?? 0 }}</x-ui.badge>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    -
+                                @endif
+                            </td>
                             <td class="px-5 py-4 sm:px-6">
                                 <div class="flex items-center gap-2">
                                     <select wire:model="statusEdits.{{ $period->id }}"
                                         class="dark:bg-dark-900 shadow-theme-xs h-9 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
-                                        @foreach (['DRAFT', 'EVALUATION', 'DISPUTE', 'CLOSED'] as $status)
+                                        @foreach (['DRAFT', 'WORKING', 'EVALUATION', 'DISPUTE', 'CLOSED'] as $status)
                                             <option value="{{ $status }}" @selected($statusEdits[$period->id] === $status)>{{ $status }}</option>
                                         @endforeach
                                     </select>

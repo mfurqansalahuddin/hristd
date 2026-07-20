@@ -9,11 +9,12 @@ use App\Models\KpiExtraCriterion;
 use App\Models\KpiExtraCriterionScore;
 use App\Models\KpiFinalScore;
 use App\Models\KpiIntegrityCategory;
+use App\Models\KpiIntegrityEvaluation;
+use App\Models\KpiIntegritySourceWeight;
 use App\Models\KpiPeriod;
 use App\Models\KpiPlan;
 use App\Models\User;
 use App\Models\ViolationReport;
-use Carbon\CarbonPeriod;
 
 /**
  * Menghitung kpi_final_scores dari 5 bucket tetap (plan.md §7) plus kriteria
@@ -29,8 +30,8 @@ class KpiEvaluationService
     /** Level jabatan yang masuk cakupan KPI bulanan — Direksi di luar cakupan (§5.2). */
     private const EVALUATED_JOB_LEVELS = [2, 3, 4];
 
-    /** Deduksi flat per aduan Pakaian Dinas tervalidasi kalau `deduction_point` belum diisi manual (§7 poin 4, asumsi — belum ada nilai baku dari user). */
-    private const DEFAULT_PAKAIAN_DEDUCTION = 20;
+    /** Deduksi flat per aduan Pakaian Dinas tervalidasi kalau `deduction_point` belum diisi manual (§7 poin 4, dikonfirmasi user 2026-07-20). */
+    private const DEFAULT_PAKAIAN_DEDUCTION = 5;
 
     public function calculateForPeriod(KpiPeriod $period): void
     {
@@ -192,16 +193,20 @@ class KpiEvaluationService
     }
 
     /**
-     * §7.1: 8 sub-kategori, tiap kategori mulai dari skor penuh
-     * (`deduction_value`-nya sendiri, §10 catatan skema), dikurangi flat per
-     * kejadian tervalidasi (dedup harian per kategori), floor 0.
+     * §7.1: Integritas kini 4 sumber berbobot (default 25/25/25/25,
+     * `kpi_integrity_source_weights`) — Penilai 1/2/3 (review wajib per
+     * kategori, `kpi_integrity_evaluations`) + Aduan Perusahaan (company-wide,
+     * `violation_reports` category=INTEGRITAS). Tiap sumber dihitung skornya
+     * sendiri lewat formula yang sama: 8 sub-kategori, tiap kategori mulai
+     * dari skor penuh (`deduction_value`-nya sendiri), nol total kalau ada
+     * temuan tervalidasi/KURANGIN di kategori itu dari sumber tsb. Lalu
+     * digabung berbobot antar sumber, diskalakan ke component weight (20).
      */
     private function integritasScore(User $user, KpiPeriod $period, int $componentWeight): float
     {
         $categories = KpiIntegrityCategory::all();
-        $categoryMaxTotal = $categories->sum('deduction_value');
 
-        if ($categoryMaxTotal === 0) {
+        if ($categories->sum('deduction_value') === 0) {
             return 0.0;
         }
 
@@ -212,16 +217,35 @@ class KpiEvaluationService
             ->whereNotNull('integrity_category_id')
             ->get();
 
-        $remainingTotal = $categories->sum(function (KpiIntegrityCategory $category) use ($validatedReports) {
-            $incidentDays = $validatedReports
-                ->where('integrity_category_id', $category->id)
-                ->unique(fn (ViolationReport $report) => $report->incident_date->toDateString())
-                ->count();
+        $decisions = KpiIntegrityEvaluation::where('reported_user_id', $user->id)
+            ->where('period_id', $period->id)
+            ->where('decision', 'KURANGIN')
+            ->get();
 
-            return max($category->deduction_value - $incidentDays * $category->deduction_value, 0);
-        });
+        $sourceScores = [
+            'ADUAN_PERUSAHAAN' => $this->integrityCategoryScore($categories, fn (KpiIntegrityCategory $c) => $validatedReports
+                ->where('integrity_category_id', $c->id)->isNotEmpty()),
+            'PENILAI_1' => $this->integrityCategoryScore($categories, fn (KpiIntegrityCategory $c) => $decisions
+                ->where('kpi_integrity_category_id', $c->id)->where('evaluator_role', 'PENILAI_1')->isNotEmpty()),
+            'PENILAI_2' => $this->integrityCategoryScore($categories, fn (KpiIntegrityCategory $c) => $decisions
+                ->where('kpi_integrity_category_id', $c->id)->where('evaluator_role', 'PENILAI_2')->isNotEmpty()),
+            'PENILAI_3' => $this->integrityCategoryScore($categories, fn (KpiIntegrityCategory $c) => $decisions
+                ->where('kpi_integrity_category_id', $c->id)->where('evaluator_role', 'PENILAI_3')->isNotEmpty()),
+        ];
 
-        return round($remainingTotal / $categoryMaxTotal * $componentWeight, 2);
+        $sourceWeights = KpiIntegritySourceWeight::pluck('weight', 'source');
+        $weighted = collect($sourceScores)->map(fn (float $score, string $source) => $score * ($sourceWeights[$source] ?? 0) / 100)->sum();
+
+        return round(min($weighted, 100) / 100 * $componentWeight, 2);
+    }
+
+    /** Skor 1 sumber Integritas (0-100): kategori nol total kalau $hasIncident($category) true, sisanya penuh. */
+    private function integrityCategoryScore(\Illuminate\Support\Collection $categories, \Closure $hasIncident): float
+    {
+        $max = $categories->sum('deduction_value');
+        $remaining = $categories->sum(fn (KpiIntegrityCategory $c) => $hasIncident($c) ? 0 : $c->deduction_value);
+
+        return $max === 0 ? 0.0 : $remaining / $max * 100;
     }
 
     private function workingDaysIn(KpiPeriod $period): int
@@ -233,10 +257,7 @@ class KpiEvaluationService
     private function workingDaysDates(KpiPeriod $period): array
     {
         $start = \Illuminate\Support\Carbon::create($period->year, $period->month, 1)->startOfMonth();
-        $end = $start->copy()->endOfMonth();
 
-        return collect(CarbonPeriod::create($start, $end))
-            ->filter(fn ($date) => ! $date->isSunday())
-            ->all();
+        return AttendanceService::workingDaysBetween($start, $start->copy()->endOfMonth())->all();
     }
 }

@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\KpiIntegrityCategory;
 use App\Models\KpiPeriod;
-use App\Models\User;
 use App\Models\ViolationReport;
-use App\Services\EvaluatorResolutionService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -15,7 +14,14 @@ use Illuminate\Validation\ValidationException;
  */
 class ViolationController extends Controller
 {
-    public function store(Request $request, EvaluatorResolutionService $service)
+    /** Lookup list for the Integritas sub-category select — mobile has no other way to learn valid IDs. */
+    public function categories()
+    {
+        return response()->json(['data' => KpiIntegrityCategory::select('id', 'name')->get()]);
+    }
+
+    /** Aduan Integritas kini terbuka untuk seluruh Perumda (sumber "Aduan Perusahaan", §7.1) — bukan cuma atasan langsung. */
+    public function store(Request $request)
     {
         $data = $request->validate([
             'reported_user_id' => ['required', 'integer', 'exists:users,id'],
@@ -25,13 +31,6 @@ class ViolationController extends Controller
             'photo' => ['required_if:category,PAKAIAN_DINAS', 'nullable', 'image', 'max:5120'],
             'incident_date' => ['required', 'date'],
         ]);
-
-        if ($data['category'] === 'INTEGRITAS') {
-            $reportedUser = User::findOrFail($data['reported_user_id']);
-            $firstSupervisor = collect($service->resolveFor($reportedUser, periodId: 0))->first()['evaluator'] ?? null;
-
-            abort_unless($firstSupervisor?->id === $request->user()->id, 403, 'Aduan Integritas hanya boleh dari atasan langsung.');
-        }
 
         $period = KpiPeriod::current();
 
