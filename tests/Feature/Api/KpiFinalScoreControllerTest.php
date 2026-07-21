@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Department;
 use App\Models\KpiEvaluation;
 use App\Models\KpiFinalScore;
 use App\Models\KpiPeriod;
@@ -9,16 +10,25 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-test('masa evaluation cuma nampilin progress, bukan skor', function () {
+test('masa evaluation nampilin progress agregat (Kinerja wajib 2, Integritas wajib 3), bukan per rencana kerja', function () {
     $period = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'EVALUATION']);
-    $staf = User::factory()->create(['job_level' => 4]);
+
+    $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN']);
+    $seksi = Department::create(['name' => 'Seksi A', 'type' => 'SEKSI', 'parent_department_id' => $bagian->id]);
+    $kasi = User::factory()->create(['job_level' => 3, 'department_id' => $seksi->id]);
+    $kabag = User::factory()->create(['job_level' => 2, 'department_id' => $bagian->id]);
+    $staf = User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id]);
+    User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id]); // rekan sejawat (PENILAI_3)
+
     $plan = KpiPlan::create(['user_id' => $staf->id, 'period_id' => $period->id, 'target_description' => 'A', 'weight' => 20, 'status' => 'APPROVED']);
-    $evaluator = User::factory()->create();
-    KpiEvaluation::create(['kpi_plan_id' => $plan->id, 'evaluator_id' => $evaluator->id, 'evaluator_role' => 'PENILAI_1', 'score' => 90]);
+    KpiEvaluation::create(['kpi_plan_id' => $plan->id, 'evaluator_id' => $kasi->id, 'evaluator_role' => 'PENILAI_1', 'score' => 90]);
 
     $response = $this->actingAs($staf, 'sanctum')->getJson("/api/kpi/final-score?period_id={$period->id}")->assertOk();
 
-    expect($response->json('progress.0.evaluators_done'))->toBe(1)
+    expect($response->json('progress.kinerja_done'))->toBe(1)
+        ->and($response->json('progress.kinerja_total'))->toBe(2)
+        ->and($response->json('progress.integritas_done'))->toBe(0)
+        ->and($response->json('progress.integritas_total'))->toBe(3)
         ->and($response->json('final_score'))->toBeNull()
         ->and($response->json('evaluations'))->toBeNull();
 });

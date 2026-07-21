@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Events\LocationPinged;
 use App\Http\Controllers\Controller;
+use App\Models\Attendance;
 use App\Models\Department;
 use App\Models\Location;
 use App\Models\UserCurrentLocation;
@@ -15,10 +16,18 @@ use Illuminate\Http\Request;
  */
 class LocationController extends Controller
 {
-    /** Sub-filter dropdown untuk Direksi §4.1 — mobile tidak punya cara lain mendapat daftar Bagian. */
+    /**
+     * Sub-filter dropdown untuk Direksi §4.1 — mobile tidak punya cara lain mendapat daftar Bagian.
+     * Cuma setingkat Bagian ke atas (Bagian/Cabang/Unit/SPI/Staf Ahli/dst); Seksi disembunyikan —
+     * staffDepartmentIdsUnder() di LocationVisibilityService sudah nurunin ke Seksi otomatis —
+     * dan Direksi disembunyikan karena Direksi sendiri bukan node Bagian yang bisa difilter.
+     */
     public function departments()
     {
-        return response()->json(['data' => Department::select('id', 'name', 'type')->orderBy('name')->get()]);
+        return response()->json(['data' => Department::select('id', 'name', 'type')
+            ->whereNotIn('type', ['SEKSI', 'DIREKSI'])
+            ->orderBy('name')
+            ->get()]);
     }
 
     /** Penanda lokasi kantor buat digambar di minimap Live Location, sama seperti Home. */
@@ -75,8 +84,16 @@ class LocationController extends Controller
             departmentFilter: $data['department_id'] ?? null,
         );
 
-        $colleagues = UserCurrentLocation::with('user')
+        // Cuma yang lagi absen masuk & belum absen keluar hari ini yang boleh tampil
+        // di Live Location — direksi & yang belum/sudah selesai absen tidak ikut absen.
+        $checkedInIds = Attendance::whereDate('date', now()->toDateString())
             ->whereIn('user_id', $visibleIds)
+            ->whereNotNull('clock_in')
+            ->whereNull('clock_out')
+            ->pluck('user_id');
+
+        $colleagues = UserCurrentLocation::with('user')
+            ->whereIn('user_id', $checkedInIds)
             ->get()
             ->map(fn (UserCurrentLocation $location) => [
                 'user_id' => $location->user_id,

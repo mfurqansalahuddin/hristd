@@ -27,8 +27,8 @@
                                         <p class="text-sm font-medium text-gray-800 dark:text-white/90">{{ $weight->label() }}</p>
                                     </td>
                                     <td class="px-5 py-4 sm:px-6">
-                                        <input type="text" wire:model.live.debounce.500ms="componentEdits.{{ $weight->id }}.description" value="{{ $componentEdits[$weight->id]['description'] }}"
-                                            class="dark:bg-dark-900 shadow-theme-xs h-9 w-full min-w-[220px] rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90" />
+                                        <textarea rows="2" wire:model.live.debounce.500ms="componentEdits.{{ $weight->id }}.description"
+                                            class="dark:bg-dark-900 shadow-theme-xs w-full min-w-[220px] resize-y rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">{{ $componentEdits[$weight->id]['description'] }}</textarea>
                                     </td>
                                     <td class="px-5 py-4 sm:px-6">
                                         <div class="relative w-24">
@@ -58,8 +58,8 @@
                                             class="dark:bg-dark-900 shadow-theme-xs h-9 w-full min-w-[160px] rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90" />
                                     </td>
                                     <td class="px-5 py-4 sm:px-6">
-                                        <input type="text" wire:model.live.debounce.500ms="criteriaEdits.{{ $criterionId }}.description" value="{{ $edit['description'] }}" required
-                                            class="dark:bg-dark-900 shadow-theme-xs h-9 w-full min-w-[220px] rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90" />
+                                        <textarea rows="2" wire:model.live.debounce.500ms="criteriaEdits.{{ $criterionId }}.description" required
+                                            class="dark:bg-dark-900 shadow-theme-xs w-full min-w-[220px] resize-y rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">{{ $edit['description'] }}</textarea>
                                     </td>
                                     <td class="px-5 py-4 sm:px-6">
                                         <div class="relative w-24">

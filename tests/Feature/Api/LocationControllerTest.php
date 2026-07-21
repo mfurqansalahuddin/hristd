@@ -1,6 +1,7 @@
 <?php
 
 use App\Events\LocationPinged;
+use App\Models\Attendance;
 use App\Models\Department;
 use App\Models\Location;
 use App\Models\User;
@@ -12,6 +13,17 @@ use Illuminate\Support\Facades\Event;
 uses(RefreshDatabase::class);
 
 afterEach(fn () => Carbon::setTestNow());
+
+/** Absen masuk hari ini, belum absen keluar — satu-satunya kondisi yang boleh tampil di Live Location. */
+function checkInToday(User $user): void
+{
+    Attendance::factory()->create([
+        'user_id' => $user->id,
+        'date' => now()->toDateString(),
+        'clock_in' => now()->toDateTimeString(),
+        'clock_out' => null,
+    ]);
+}
 
 test('ping upsert lokasi terkini di dalam jam kerja', function () {
     Event::fake([LocationPinged::class]);
@@ -31,6 +43,7 @@ test('ping dengan mocked=true tersimpan dan tampil di colleagues', function () {
     $kasi1 = User::factory()->create(['job_level' => 3, 'department_id' => $bagian->id]);
     $kasi2 = User::factory()->create(['job_level' => 3, 'department_id' => $bagian->id]);
     Carbon::setTestNow(Carbon::create(2026, 7, 14, 10, 0));
+    checkInToday($kasi2);
 
     $this->actingAs($kasi2, 'sanctum')->postJson('/api/location/ping', ['lat' => 5.5, 'long' => 95.3, 'mocked' => true])->assertOk();
 
@@ -62,10 +75,47 @@ test('staf hanya lihat rekan 1 seksi via endpoint colleagues', function () {
     foreach ([$rekan, $pejabat] as $u) {
         UserCurrentLocation::create(['user_id' => $u->id, 'lat' => 5.5, 'long' => 95.3, 'last_updated_at' => now()]);
     }
+    checkInToday($rekan);
+    checkInToday($pejabat);
 
     $response = $this->actingAs($staf, 'sanctum')->getJson('/api/location/colleagues')->assertOk();
 
     expect($response->json('data.*.user_id'))->toContain($rekan->id)->not->toContain($pejabat->id);
+});
+
+test('rekan yang belum absen masuk tidak tampil di colleagues', function () {
+    $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN']);
+    $seksi = Department::create(['name' => 'Seksi A', 'type' => 'SEKSI', 'parent_department_id' => $bagian->id]);
+
+    $staf = User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id]);
+    $rekan = User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id]);
+
+    UserCurrentLocation::create(['user_id' => $rekan->id, 'lat' => 5.5, 'long' => 95.3, 'last_updated_at' => now()]);
+    // Tidak ada Attendance sama sekali — direksi & rekan yang belum absen masuk masuk kondisi ini.
+
+    $response = $this->actingAs($staf, 'sanctum')->getJson('/api/location/colleagues')->assertOk();
+
+    expect($response->json('data.*.user_id'))->not->toContain($rekan->id);
+});
+
+test('rekan yang sudah absen keluar tidak tampil lagi di colleagues', function () {
+    $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN']);
+    $seksi = Department::create(['name' => 'Seksi A', 'type' => 'SEKSI', 'parent_department_id' => $bagian->id]);
+
+    $staf = User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id]);
+    $rekan = User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id]);
+
+    UserCurrentLocation::create(['user_id' => $rekan->id, 'lat' => 5.5, 'long' => 95.3, 'last_updated_at' => now()]);
+    Attendance::factory()->create([
+        'user_id' => $rekan->id,
+        'date' => now()->toDateString(),
+        'clock_in' => now()->subHours(8)->toDateTimeString(),
+        'clock_out' => now()->toDateTimeString(),
+    ]);
+
+    $response = $this->actingAs($staf, 'sanctum')->getJson('/api/location/colleagues')->assertOk();
+
+    expect($response->json('data.*.user_id'))->not->toContain($rekan->id);
 });
 
 test('staf tidak boleh minta scope subordinates', function () {
@@ -83,12 +133,27 @@ test('list departemen untuk sub-filter Direksi', function () {
     expect($response->json('data.0.name'))->toBe('Bagian Umum');
 });
 
+test('list departemen sub-filter Direksi tidak menyertakan Seksi maupun Direksi', function () {
+    $user = User::factory()->create(['job_level' => 1]);
+    $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN']);
+    Department::create(['name' => 'Seksi Anggaran', 'type' => 'SEKSI', 'parent_department_id' => $bagian->id]);
+    Department::create(['name' => 'Direktur Utama', 'type' => 'DIREKSI']);
+
+    $response = $this->actingAs($user, 'sanctum')->getJson('/api/location/departments')->assertOk();
+
+    expect($response->json('data.*.name'))
+        ->toContain('Bagian Umum')
+        ->not->toContain('Seksi Anggaran')
+        ->not->toContain('Direktur Utama');
+});
+
 test('colleagues menyertakan photo_url', function () {
     $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN']);
     $kasi1 = User::factory()->create(['job_level' => 3, 'department_id' => $bagian->id]);
     $kasi2 = User::factory()->create(['job_level' => 3, 'department_id' => $bagian->id]);
 
     UserCurrentLocation::create(['user_id' => $kasi2->id, 'lat' => 5.5, 'long' => 95.3, 'last_updated_at' => now()]);
+    checkInToday($kasi2);
 
     $response = $this->actingAs($kasi1, 'sanctum')->getJson('/api/location/colleagues')->assertOk();
 
@@ -110,6 +175,7 @@ test('is_online true kalau update kurang dari 3 menit lalu', function () {
     $kasi2 = User::factory()->create(['job_level' => 3, 'department_id' => $bagian->id]);
 
     UserCurrentLocation::create(['user_id' => $kasi2->id, 'lat' => 5.5, 'long' => 95.3, 'last_updated_at' => now()->subMinutes(1)]);
+    checkInToday($kasi2);
 
     $response = $this->actingAs($kasi1, 'sanctum')->getJson('/api/location/colleagues')->assertOk();
 
