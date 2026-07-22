@@ -167,6 +167,37 @@ test('grup rekan >= 3 orang: siklus, tidak ada yang menilai diri sendiri', funct
     expect($evaluatorIds->unique()->sort()->values()->all())->toBe($stafs->pluck('id')->sort()->values()->all());
 });
 
+test('pramagang tetap ikut cakupan KPI penuh (dikonfirmasi user: pembiasaan sebelum berlaku ke gaji)', function () {
+    $org = makeOrgTree();
+    $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN', 'parent_department_id' => $org['dirKeuangan']->id]);
+    $seksi = Department::create(['name' => 'Seksi Gudang', 'type' => 'SEKSI', 'parent_department_id' => $bagian->id]);
+
+    $kabag = User::factory()->create(['job_level' => 2, 'department_id' => $bagian->id]);
+    $kasi = User::factory()->create(['job_level' => 3, 'department_id' => $seksi->id]);
+    $pramagang = User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id, 'employment_status' => 'PRAMAGANG']);
+
+    $result = $this->service->resolveFor($pramagang, periodId: 1);
+
+    expect($result[0]['evaluator']->id)->toBe($kasi->id)
+        ->and($result[1]['evaluator']->id)->toBe($kabag->id);
+});
+
+test('pramagang bisa terpilih jadi rekan sejawat (Penilai 3) untuk staf lain', function () {
+    $org = makeOrgTree();
+    $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN', 'parent_department_id' => $org['dirKeuangan']->id]);
+    $seksi = Department::create(['name' => 'Seksi Gudang', 'type' => 'SEKSI', 'parent_department_id' => $bagian->id]);
+
+    User::factory()->create(['job_level' => 2, 'department_id' => $bagian->id]);
+    User::factory()->create(['job_level' => 3, 'department_id' => $seksi->id]);
+    $staf = User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id]);
+    $pramagang = User::factory()->create(['job_level' => 4, 'department_id' => $seksi->id, 'employment_status' => 'PRAMAGANG']);
+
+    // Satu-satunya "rekan" yang ada berstatus PRAMAGANG -> tetap sah jadi Penilai 3 (bukan dikecualikan lagi).
+    $result = $this->service->resolveFor($staf, periodId: 1);
+
+    expect($result[2]['evaluator']->id)->toBe($pramagang->id);
+});
+
 test('evaluateesFor mengembalikan kebalikan dari resolveFor', function () {
     $org = makeOrgTree();
     $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN', 'parent_department_id' => $org['dirKeuangan']->id]);

@@ -34,10 +34,18 @@ class AuthController extends Controller
 
         $token = $user->createToken('api-token')->plainTextToken;
 
+        // Bentuk sama dengan GET /user (§15.1 mobile-app.md) — client mengasumsikan
+        // photo_url/jabatan_label selalu ada di setiap payload User.
+        $user->load('department');
+
         return response()->json([
             'message' => 'Login successful',
             'token' => $token,
-            'user' => $user,
+            'user' => [
+                ...$user->toArray(),
+                'jabatan_label' => $user->jabatanLabel(),
+                'photo_url' => $user->photoUrl(),
+            ],
         ]);
     }
 

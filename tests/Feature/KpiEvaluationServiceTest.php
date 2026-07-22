@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Attendance;
+use App\Models\KpiComponentWeight;
 use App\Models\KpiEvaluation;
 use App\Models\KpiEvaluatorWeight;
 use App\Models\KpiExtraCriterion;
@@ -84,7 +85,7 @@ test('kehadiran & apel: hadir penuh + apel penuh menghasilkan skor maksimum buck
         ->and((float) $final->score_apel)->toBe(5.0);
 });
 
-test('kehadiran: hari Alpa mengurangi rasio hadir', function () {
+test('kehadiran: hari Alpa mengurangi rasio hadir (Senin-Jumat saja, Sabtu-Minggu dilewati)', function () {
     $staf = User::factory()->create(['job_level' => 4]);
 
     $start = Carbon::create(2026, 6, 1);
@@ -93,7 +94,7 @@ test('kehadiran: hari Alpa mengurangi rasio hadir', function () {
     $alpaMarked = false;
 
     for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
-        if ($date->isSunday()) {
+        if ($date->isSaturday() || $date->isSunday()) {
             continue;
         }
         $workingDays++;
@@ -110,6 +111,26 @@ test('kehadiran: hari Alpa mengurangi rasio hadir', function () {
 
     $expected = round((($workingDays - 1) / $workingDays) * 20, 2);
     expect((float) $final->score_kehadiran)->toBe($expected);
+});
+
+test('kehadiran: absensi hari Sabtu tidak ikut menaikkan rasio (di luar cakupan Kehadiran bulanan)', function () {
+    $staf = User::factory()->create(['job_level' => 4]);
+
+    $start = Carbon::create(2026, 6, 1);
+    $end = $start->copy()->endOfMonth();
+
+    for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+        if ($date->isSaturday()) {
+            // Rajin hadir tiap Sabtu -> tidak boleh menutupi Alpa di hari kerja (Senin-Jumat).
+            Attendance::factory()->create(['user_id' => $staf->id, 'date' => $date->toDateString(), 'status' => 'HADIR']);
+        } elseif (! $date->isSunday()) {
+            Attendance::factory()->create(['user_id' => $staf->id, 'date' => $date->toDateString(), 'status' => 'ALPA']);
+        }
+    }
+
+    $final = $this->service->calculateForUser($staf, $this->period);
+
+    expect((float) $final->score_kehadiran)->toBe(0.0);
 });
 
 test('pakaian dinas: dedup harian, deduction_point 0 fallback ke default 5', function () {
@@ -187,4 +208,61 @@ test('calculateForPeriod hanya menghitung job_level 2-4, Direksi di luar cakupan
 
     expect(\App\Models\KpiFinalScore::where('user_id', $direksi->id)->exists())->toBeFalse()
         ->and(\App\Models\KpiFinalScore::where('period_id', $this->period->id)->count())->toBe(1);
+});
+
+test('calculateForPeriod tetap menghitung PRAMAGANG (dikonfirmasi user: ikut KPI penuh walau belum digaji)', function () {
+    $pramagang = User::factory()->create(['job_level' => 4, 'employment_status' => 'PRAMAGANG']);
+    User::factory()->create(['job_level' => 4, 'employment_status' => 'TETAP']);
+
+    $this->service->calculateForPeriod($this->period);
+
+    expect(\App\Models\KpiFinalScore::where('user_id', $pramagang->id)->exists())->toBeTrue()
+        ->and(\App\Models\KpiFinalScore::where('period_id', $this->period->id)->count())->toBe(2);
+});
+
+test('salary_percentage disimpan di kpi_final_scores sesuai band skor (kehadiran & apel penuh, tanpa rencana kerja)', function () {
+    $staf = User::factory()->create(['job_level' => 4]);
+
+    $start = Carbon::create(2026, 6, 1);
+    $end = $start->copy()->endOfMonth();
+
+    for ($date = $start->copy(); $date->lte($end); $date->addDay()) {
+        if ($date->isSunday()) {
+            continue;
+        }
+
+        Attendance::factory()->create([
+            'user_id' => $staf->id,
+            'date' => $date->toDateString(),
+            'status' => 'HADIR',
+            'is_apel' => $date->isMonday(),
+        ]);
+    }
+
+    // Tanpa rencana kerja -> Kinerja 0, jadi grand total cuma dari Kehadiran(20)+Apel(5)+Pakaian(5)+Integritas(20) = 50.
+    $final = $this->service->calculateForUser($staf, $this->period);
+
+    expect((float) $final->grand_total_score)->toBe(50.0)
+        ->and($final->salary_percentage)->toBe(60);
+});
+
+test('snapshot periode dibekukan saat dibuat — edit master bobot setelahnya tidak mempengaruhi periode yang sudah berjalan', function () {
+    $staf = User::factory()->create(['job_level' => 4]);
+
+    $plan = KpiPlan::create([
+        'user_id' => $staf->id, 'period_id' => $this->period->id,
+        'target_description' => 'Target A', 'weight' => 40, 'status' => 'APPROVED',
+    ]);
+
+    foreach (['PENILAI_1' => 100, 'PENILAI_2' => 100, 'PENILAI_3' => 100] as $role => $score) {
+        KpiEvaluation::create(['kpi_plan_id' => $plan->id, 'evaluator_id' => User::factory()->create()->id, 'evaluator_role' => $role, 'score' => $score]);
+    }
+
+    // Bobot KINERJA saat periode dibuat masih default (50) — snapshot mengunci nilai ini.
+    KpiComponentWeight::where('component', 'KINERJA')->update(['weight' => 10]);
+
+    $final = $this->service->calculateForUser($staf, $this->period);
+
+    // Plafon tetap 50 (dari snapshot), bukan 10 (nilai master yang baru diedit).
+    expect((float) $final->score_kinerja)->toBe(40.0);
 });

@@ -27,7 +27,7 @@ class EmployeeRequest extends FormRequest
             'instansi' => ['required', 'string', 'in:PERUMDAM_TD,KOPKARTIRDA'],
             'employment_status' => ['required', 'string', 'in:TETAP,PEGAWAI_80,PRAMAGANG,MAGANG,KONTRAK'],
             'leave_balance' => ['required', 'integer', 'min:0'],
-            'is_admin' => ['sometimes', 'boolean'],
+            'role' => ['required', 'string', 'in:SUPER_ADMIN,ADMIN_KEPEGAWAIAN,STAFF'],
             'photo' => ['nullable', 'image', 'max:2048'],
         ];
     }

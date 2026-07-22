@@ -27,6 +27,7 @@ class MenuHelper
                     ['name' => 'Periode KPI', 'path' => '/admin/kpi-periods'],
                     ['name' => 'Master Kategori', 'path' => '/admin/kpi-categories'],
                     ['name' => 'Validasi Aduan', 'path' => '/admin/kpi-violations'],
+                    ['name' => 'Nilai Akhir & Persentase Gaji', 'path' => '/admin/kpi-final-scores'],
                 ],
             ],
             [

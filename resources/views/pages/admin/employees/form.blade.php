@@ -125,12 +125,14 @@
                 <x-form.input name="leave_balance" type="number" label="Sisa Cuti"
                     :value="$employee->leave_balance ?? 12" required />
 
-                <div class="flex items-center gap-2 pt-7">
-                    <input type="checkbox" id="is_admin" name="is_admin" value="1" @checked($employee->is_admin)
-                        class="h-4 w-4 rounded border-gray-300">
-                    <label for="is_admin" class="text-sm font-medium text-gray-700 dark:text-gray-400">
-                        Akses Panel HRD (Admin)
-                    </label>
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Role Akses</label>
+                    <select name="role" required
+                        class="dark:bg-dark-900 shadow-theme-xs h-11 w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
+                        @foreach (\App\Models\User::ROLE_LABELS as $value => $label)
+                            <option value="{{ $value }}" @selected($employee->role == $value || (! $employee->exists && $value === \App\Models\User::ROLE_STAFF))>{{ $label }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
 

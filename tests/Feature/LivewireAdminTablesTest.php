@@ -24,7 +24,7 @@ use Livewire\Livewire;
 uses(RefreshDatabase::class);
 
 test('employees table filters by search without a full page reload', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     User::factory()->create(['name' => 'Budi Santoso']);
     User::factory()->create(['name' => 'Siti Aminah']);
 
@@ -38,7 +38,7 @@ test('employees table filters by search without a full page reload', function ()
 });
 
 test('employees table deletes a row via a livewire action', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $employee = User::factory()->create(['name' => 'Dihapus Nanti']);
 
     Livewire::actingAs($admin)->test(EmployeesTable::class)
@@ -50,7 +50,7 @@ test('employees table deletes a row via a livewire action', function () {
 });
 
 test('locations table paginates and deletes without a redirect', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $location = Location::create([
         'name' => 'Kantor Cabang', 'type' => 'RADIUS', 'lat' => 5.5, 'long' => 95.3, 'radius_meters' => 50,
     ]);
@@ -65,7 +65,7 @@ test('locations table paginates and deletes without a redirect', function () {
 });
 
 test('attendances table filters by status realtime', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $onTime = User::factory()->create(['name' => 'Budi Ontime']);
     Attendance::factory()->create(['user_id' => $onTime->id, 'date' => '2026-07-14', 'clock_in' => '2026-07-14 07:45:00']);
     $late = User::factory()->create(['name' => 'Siti Telat']);
@@ -82,7 +82,7 @@ test('attendances table filters by status realtime', function () {
 });
 
 test('hr bisa approve/reject kehadiran yang telat dari tabel admin', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $late = User::factory()->create(['name' => 'Siti Telat']);
     $attendance = Attendance::factory()->create([
         'user_id' => $late->id, 'date' => '2026-07-14', 'clock_in' => '2026-07-14 08:30:00',
@@ -103,7 +103,7 @@ test('hr bisa approve/reject kehadiran yang telat dari tabel admin', function ()
 });
 
 test('kpi categories panel updates weights and manages integrity categories live', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $kinerja = KpiComponentWeight::where('component', 'KINERJA')->firstOrFail();
     $originalWeight = $kinerja->weight;
 
@@ -129,7 +129,7 @@ test('kpi categories panel updates weights and manages integrity categories live
 });
 
 test('kpi periods table opens a new period and updates status live', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
 
     $component = Livewire::actingAs($admin)->test(KpiPeriodsTable::class)
         ->set('month', 3)
@@ -148,8 +148,43 @@ test('kpi periods table opens a new period and updates status live', function ()
     expect($period->fresh()->status)->toBe('EVALUATION');
 });
 
+test('kpi periods table shows a weights confirmation screen before creating and snapshots current weights', function () {
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
+
+    Livewire::actingAs($admin)->test(KpiPeriodsTable::class)
+        ->set('month', 4)
+        ->set('year', 2026)
+        ->call('openCreateConfirm')
+        ->assertSet('confirmingCreate', true)
+        ->assertSee('Kinerja Teknis')
+        ->call('store')
+        ->assertSet('confirmingCreate', false);
+
+    $period = KpiPeriod::where('month', 4)->where('year', 2026)->firstOrFail();
+
+    expect($period->weights_snapshot['component_weights']['KINERJA'])->toBe(50);
+});
+
+test('kpi periods table auto-approves SUBMITTED rencana kerja when leaving DRAFT phase', function () {
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
+    $staf = User::factory()->create(['job_level' => 4]);
+    $period = KpiPeriod::create(['month' => 5, 'year' => 2026, 'status' => 'DRAFT']);
+
+    $plan = \App\Models\KpiPlan::create([
+        'user_id' => $staf->id, 'period_id' => $period->id,
+        'target_description' => 'Target', 'weight' => 30, 'status' => 'SUBMITTED',
+    ]);
+
+    Livewire::actingAs($admin)->test(KpiPeriodsTable::class)
+        ->set("statusEdits.{$period->id}", 'WORKING')
+        ->call('updateStatus', $period->id)
+        ->assertNoRedirect();
+
+    expect($plan->fresh()->status)->toBe('APPROVED');
+});
+
 test('jabatan table assigns and vacates a position without locking it', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $root = Department::create(['name' => 'Direktur Utama', 'type' => 'DIREKSI']);
     $bagian = Department::create(['name' => 'Bagian Umum', 'type' => 'BAGIAN', 'parent_department_id' => $root->id]);
     $kabag = User::factory()->create(['name' => 'Budi Kabag', 'department_id' => $bagian->id, 'job_level' => 2]);
@@ -172,7 +207,7 @@ test('jabatan table assigns and vacates a position without locking it', function
 });
 
 test('jabatan table creates a new position and assigns an existing employee', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $root = Department::create(['name' => 'Direktur Utama', 'type' => 'DIREKSI']);
     $direkturBidang = Department::create(['name' => 'Direktur Teknik', 'type' => 'DIREKSI', 'parent_department_id' => $root->id, 'directorate' => 'TEKNIK']);
     $calon = User::factory()->create(['name' => 'Calon Kabag Baru', 'job_level' => 4]);
@@ -197,7 +232,7 @@ test('jabatan table creates a new position and assigns an existing employee', fu
 
 test('cuti table creates a manual entry and approves an app-submitted request', function () {
     Storage::fake('public');
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $employee = User::factory()->create(['name' => 'Cuti Pegawai']);
 
     Livewire::actingAs($admin)->test(CutiTable::class)
@@ -238,7 +273,7 @@ test('cuti table creates a manual entry and approves an app-submitted request', 
 });
 
 test('cuti table rejects a request with a required reason', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $employee = User::factory()->create();
     $pending = LeaveRequest::create([
         'user_id' => $employee->id,
@@ -268,7 +303,7 @@ test('cuti table rejects a request with a required reason', function () {
 });
 
 test('sakit table lists requests read-only', function () {
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $employee = User::factory()->create(['name' => 'Sakit Pegawai']);
     LeaveRequest::create([
         'user_id' => $employee->id,
@@ -287,7 +322,7 @@ test('sakit table lists requests read-only', function () {
 
 test('dinas luar table creates entries for multiple employees sharing one batch', function () {
     Storage::fake('public');
-    $admin = User::factory()->create(['is_admin' => true]);
+    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $employeeA = User::factory()->create(['name' => 'DL Pegawai A']);
     $employeeB = User::factory()->create(['name' => 'DL Pegawai B']);
 

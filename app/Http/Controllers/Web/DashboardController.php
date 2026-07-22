@@ -14,12 +14,16 @@ class DashboardController extends Controller
     {
         $today = today()->toDateString();
 
+        // Direksi (job_level 1) bukan staff untuk urusan absensi/KPI (plan.md §5.2) — dikeluarkan
+        // dari agregat ringkasan supaya tidak salah dihitung sebagai staf biasa.
+        $staffIds = User::where('job_level', '!=', 1)->pluck('id');
+
         return view('pages.admin.dashboard', [
             'title' => 'Dashboard',
-            'totalEmployees' => User::count(),
-            'presentToday' => Attendance::whereDate('date', $today)->whereIn('status', ['HADIR', 'TELAT'])->count(),
-            'lateToday' => Attendance::whereDate('date', $today)->where('status', 'TELAT')->count(),
-            'pendingLeaveRequests' => LeaveRequest::where('status', 'PENDING')->count(),
+            'totalEmployees' => $staffIds->count(),
+            'presentToday' => Attendance::whereDate('date', $today)->whereIn('user_id', $staffIds)->whereIn('status', ['HADIR', 'TELAT'])->count(),
+            'lateToday' => Attendance::whereDate('date', $today)->whereIn('user_id', $staffIds)->where('status', 'TELAT')->count(),
+            'pendingLeaveRequests' => LeaveRequest::whereIn('user_id', $staffIds)->where('status', 'PENDING')->count(),
             'currentPeriod' => KpiPeriod::orderByDesc('year')->orderByDesc('month')->first(),
         ]);
     }

@@ -26,9 +26,71 @@ const officeLocationEditor = () => {
 
     const map = L.map('officeLocationMap', { center: [initialLat, initialLong], zoom: 15 });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
+    const satellite = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        { attribution: 'Tiles &copy; Esri' },
+    );
+    // Tombol jenis peta — custom (bukan L.control.layers bawaan) biar ukurannya kecil (34x34)
+    // dan bukanya jadi panel kecil, konsisten dengan tampilan di app mobile.
+    const layersControl = new L.Control({ position: 'topright' });
+    layersControl.onAdd = () => {
+        const wrapper = L.DomUtil.create('div');
+        wrapper.style.position = 'relative';
+
+        const button = L.DomUtil.create('button', 'leaflet-bar', wrapper);
+        button.type = 'button';
+        button.title = 'Jenis peta';
+        button.innerHTML =
+            '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>';
+        button.style.width = '34px';
+        button.style.height = '34px';
+        button.style.display = 'flex';
+        button.style.alignItems = 'center';
+        button.style.justifyContent = 'center';
+        button.style.background = '#fff';
+        button.style.border = 'none';
+        button.style.cursor = 'pointer';
+        button.style.color = '#333';
+
+        const panel = L.DomUtil.create('div', '', wrapper);
+        panel.style.cssText =
+            'display:none;position:absolute;top:38px;right:0;min-width:140px;padding:8px;border-radius:8px;background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.4);font-family:inherit;';
+        panel.innerHTML = `
+            <div style="font-size:12px;font-weight:600;color:#333;margin-bottom:6px;">Jenis Peta</div>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#333;padding:4px 0;cursor:pointer;">
+                <input type="radio" name="basemap" value="streets" checked /> Default
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:#333;padding:4px 0;cursor:pointer;">
+                <input type="radio" name="basemap" value="satellite" /> Satelit
+            </label>
+        `;
+
+        L.DomEvent.disableClickPropagation(wrapper);
+        L.DomEvent.on(button, 'click', () => {
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        });
+        panel.querySelectorAll('input[type="radio"]').forEach((input) => {
+            input.addEventListener('change', (event) => {
+                if (event.target.value === 'satellite') {
+                    map.removeLayer(streets);
+                    satellite.addTo(map);
+                } else {
+                    map.removeLayer(satellite);
+                    streets.addTo(map);
+                }
+            });
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!wrapper.contains(event.target)) panel.style.display = 'none';
+        });
+
+        return wrapper;
+    };
+    layersControl.addTo(map);
 
     let marker = null;
     let circle = null;

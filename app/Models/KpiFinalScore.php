@@ -9,6 +9,7 @@ class KpiFinalScore extends Model
     protected $fillable = [
         'user_id', 'period_id', 'score_kinerja', 'score_kehadiran',
         'score_apel', 'score_pakaian', 'score_integritas', 'grand_total_score',
+        'salary_percentage',
     ];
 
     /** @var array<string, string> label predikat => warna x-ui.badge */

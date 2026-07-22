@@ -5,24 +5,77 @@
         </div>
     @endif
 
+    @if ($scheduleWarning)
+        <div class="mb-6">
+            <x-ui.alert variant="warning" :message="$scheduleWarning" />
+        </div>
+    @endif
+
     <div class="mb-6">
         <x-common.component-card title="Buka Periode KPI Baru">
-            <form wire:submit="store" class="flex flex-wrap items-end gap-4">
+            @if (! $confirmingCreate)
+                <form wire:submit="openCreateConfirm" class="flex flex-wrap items-end gap-4">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Bulan</label>
+                        <select wire:model="month"
+                            class="dark:bg-dark-900 shadow-theme-xs h-11 w-40 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
+                            @foreach (range(1, 12) as $m)
+                                <option value="{{ $m }}">{{ $m }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <x-form.input name="year" type="number" wire:model="year" label="Tahun" required />
+                    <button type="submit"
+                        class="inline-flex items-center justify-center rounded-lg bg-brand-500 px-5 py-3.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                        Buka Periode
+                    </button>
+                </form>
+            @else
                 <div>
-                    <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Bulan</label>
-                    <select wire:model="month"
-                        class="dark:bg-dark-900 shadow-theme-xs h-11 w-40 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
-                        @foreach (range(1, 12) as $m)
-                            <option value="{{ $m }}">{{ $m }}</option>
-                        @endforeach
-                    </select>
+                    <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+                        Bobot komponen berikut akan dibekukan (snapshot) khusus untuk periode {{ $month }}/{{ $year }} —
+                        perubahan master data setelah ini <strong>tidak</strong> akan mempengaruhi periode ini.
+                    </p>
+
+                    <div class="mb-4">
+                        <p class="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Bobot Komponen KPI</p>
+                        <ul class="text-sm text-gray-600 dark:text-gray-400">
+                            @foreach ($weightsPreview['component_weights'] ?? [] as $component => $weight)
+                                <li>{{ \App\Models\KpiComponentWeight::LABELS[$component] ?? $component }}: {{ $weight }}%</li>
+                            @endforeach
+                        </ul>
+                    </div>
+
+                    <div class="mb-4">
+                        <p class="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Bobot Sumber Integritas</p>
+                        <ul class="text-sm text-gray-600 dark:text-gray-400">
+                            @foreach ($weightsPreview['integrity_source_weights'] ?? [] as $source => $weight)
+                                <li>{{ \App\Models\KpiIntegritySourceWeight::LABELS[$source] ?? $source }}: {{ $weight }}%</li>
+                            @endforeach
+                        </ul>
+                    </div>
+
+                    <div class="mb-4">
+                        <p class="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Band Persentase Gaji</p>
+                        <ul class="text-sm text-gray-600 dark:text-gray-400">
+                            @foreach ($weightsPreview['salary_bands'] ?? [] as $band)
+                                <li>{{ $band['min_score'] !== null ? "Skor > {$band['min_score']}" : 'Skor lainnya' }}: {{ $band['percentage'] }}% gaji</li>
+                            @endforeach
+                        </ul>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button type="button" wire:click="store"
+                            class="inline-flex items-center justify-center rounded-lg bg-brand-500 px-5 py-3.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
+                            Setuju & Buka Periode
+                        </button>
+                        <button type="button" wire:click="cancelCreate"
+                            class="inline-flex items-center justify-center rounded-lg bg-white px-5 py-3.5 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700">
+                            Batal
+                        </button>
+                    </div>
                 </div>
-                <x-form.input name="year" type="number" wire:model="year" label="Tahun" required />
-                <button type="submit"
-                    class="inline-flex items-center justify-center rounded-lg bg-brand-500 px-5 py-3.5 text-sm font-medium text-white shadow-theme-xs hover:bg-brand-600">
-                    Buka Periode
-                </button>
-            </form>
+            @endif
         </x-common.component-card>
     </div>
 

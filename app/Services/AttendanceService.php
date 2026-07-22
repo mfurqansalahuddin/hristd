@@ -10,10 +10,15 @@ use Illuminate\Support\Collection;
 
 class AttendanceService
 {
-    /** Hari kerja (Senin-Sabtu, Minggu dilewati) dalam rentang tanggal — dipakai kuota cuti dan (via KpiEvaluationService) rasio kehadiran bulanan. */
+    /**
+     * Hari kerja (Senin-Jumat) dalam rentang tanggal — dipakai kuota cuti dan (via
+     * KpiEvaluationService) rasio kehadiran bulanan. Sabtu sengaja dikeluarkan
+     * (dikonfirmasi user): setengah hari, dihitung terpisah ke mekanisme gaji akhir
+     * tahun yang di luar cakupan sistem ini — bukan bagian dari Kehadiran/Cuti bulanan.
+     */
     public static function workingDaysBetween(Carbon $start, Carbon $end): Collection
     {
-        return collect(CarbonPeriod::create($start, $end))->filter(fn ($date) => ! $date->isSunday())->values();
+        return collect(CarbonPeriod::create($start, $end))->filter(fn ($date) => ! $date->isSunday() && ! $date->isSaturday())->values();
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Livewire\Concerns\PaginatesRows;
 use App\Livewire\Concerns\SortsColumns;
+use App\Models\KpiCycleSchedule;
 use App\Models\KpiFinalScore;
 use App\Models\KpiPeriod;
 use App\Models\KpiPlan;
@@ -23,6 +24,9 @@ class KpiPeriodsTable extends Component
     public int $year;
 
     public array $statusEdits = [];
+
+    /** Layar konfirmasi bobot ditampilkan sebelum periode benar-benar dibuat (dikonfirmasi user). */
+    public bool $confirmingCreate = false;
 
     #[Url(history: true)]
     public string $status = '';
@@ -44,6 +48,21 @@ class KpiPeriodsTable extends Component
         $this->resetPage();
     }
 
+    public function openCreateConfirm(): void
+    {
+        $this->validate([
+            'month' => ['required', 'integer', 'between:1,12'],
+            'year' => ['required', 'integer', 'min:2020'],
+        ]);
+
+        $this->confirmingCreate = true;
+    }
+
+    public function cancelCreate(): void
+    {
+        $this->confirmingCreate = false;
+    }
+
     public function store(): void
     {
         $data = $this->validate([
@@ -53,6 +72,7 @@ class KpiPeriodsTable extends Component
 
         KpiPeriod::create($data);
 
+        $this->confirmingCreate = false;
         session()->flash('success', 'Periode KPI berhasil dibuka.');
     }
 
@@ -65,7 +85,14 @@ class KpiPeriodsTable extends Component
         ]);
 
         $period = KpiPeriod::findOrFail($periodId);
+        $wasDraft = $period->status === 'DRAFT';
         $period->update(['status' => $status]);
+
+        // Rencana kerja SUBMITTED yang belum sempat di-approve atasan saat fase DRAFT ditutup
+        // dianggap tetap OK (auto-approve on timeout, dikonfirmasi user) — bukan dianggap 0.
+        if ($wasDraft && $status !== 'DRAFT') {
+            KpiPlan::where('period_id', $period->id)->where('status', 'SUBMITTED')->update(['status' => 'APPROVED']);
+        }
 
         // Fase C (plan.md §12): transisi ke CLOSED memicu hitung kpi_final_scores dari 5 bucket (§7).
         if ($status === 'CLOSED') {
@@ -105,7 +132,38 @@ class KpiPeriodsTable extends Component
             'draftStats' => $this->draftPeriodStats($periods, $eligibleUserIds),
             'evaluationStats' => $this->evaluationPeriodStats($periods, $eligibleUserIds),
             'closedStats' => $this->closedPeriodStats($periods),
+            'scheduleWarning' => $this->scheduleWarning(),
+            'weightsPreview' => $this->confirmingCreate ? KpiPeriod::buildWeightsSnapshot() : null,
         ]);
+    }
+
+    /**
+     * Banner read-only: bandingkan tanggal hari ini vs fase yang seharusnya menurut master
+     * jadwal (`kpi_cycle_schedule`) vs status periode berjalan yang sebenarnya — supaya HRD
+     * tidak lupa pindah fase manual (dikonfirmasi user: tetap manual, bukan otomatis).
+     */
+    private function scheduleWarning(): ?string
+    {
+        $expectedPhase = KpiCycleSchedule::phaseForDay(now()->day);
+        $current = KpiPeriod::current();
+
+        if (! $expectedPhase || ! $current) {
+            return null;
+        }
+
+        $expectedStatus = match ($expectedPhase->phase) {
+            'PENGINGAT_DIBUKA' => 'WORKING',
+            'PENILAIAN' => 'EVALUATION',
+            'REVIEW_VALIDASI' => 'DISPUTE',
+            'FINALISASI' => 'CLOSED',
+            default => null,
+        };
+
+        if ($expectedStatus === null || $current->status === $expectedStatus) {
+            return null;
+        }
+
+        return "Hari ini seharusnya sudah masuk fase \"{$expectedPhase->label()}\" (status {$expectedStatus}), tapi periode {$current->month}/{$current->year} masih berstatus {$current->status}. Jangan lupa pindahkan fase manual.";
     }
 
     /**

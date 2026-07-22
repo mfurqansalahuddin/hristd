@@ -7,41 +7,56 @@ use App\Models\Location;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 class AttendanceSeeder extends Seeder
 {
     /**
-     * Nama lokasi kantor nyata yang sudah dibuat admin lewat halaman Manajemen Kantor
-     * (§8.1.1 plan.md) — dipakai sebagai "kantor asal" pegawai secara bergilir, bukan
-     * dibuat baru di sini supaya tidak menduplikasi/menimpa geofence poligon yang sudah
-     * digambar admin.
+     * Nama Department (top-level: Bagian/Cabang/Unit/SPI/PAL/Staf Ahli) => nama Location
+     * tempat mereka absen, sesuai kondisi riil kantor Perumdam Tirta Daroy. Bagian Produksi
+     * sengaja tidak di sini — stafnya di-split acak antara WTP Siron & WTP Lubok Batee di
+     * resolveHomeLocation(). Direksi tidak disertakan sama sekali (lihat run()), dan
+     * "Balai Kota Banda Aceh" sengaja tidak jadi home siapapun (kantor terdaftar tapi tak
+     * ada staf yang berkantor di sana).
      *
-     * @var list<string>
+     * @var array<string, string>
      */
-    private const LOCATION_NAMES = ['Kantor Pusat', 'Kantor Cabang Selatan', 'WTP Siron'];
+    private const DEPARTMENT_LOCATIONS = [
+        'Bagian Keuangan' => 'Kantor Pusat',
+        'Bagian Umum' => 'Kantor Pusat',
+        'Bagian Hubungan Pelanggan' => 'Kantor Pusat',
+        'Unit Teknologi Informasi' => 'Kantor Pusat',
+        'Satuan Pengawas Internal (SPI)' => 'Kantor Pusat',
+        'Staf Ahli Bidang Administrasi' => 'Kantor Pusat',
+        'Staf Ahli Bidang Teknik' => 'Kantor Pusat',
+        'Bagian Perencanaan Teknik dan Pengawasan Teknik' => 'Kantor Pusat',
+        'Bagian Transmisi dan Distribusi' => 'Kantor Pusat',
+        'Cabang Teuku Nyak Arief' => 'Kantor Pusat',
+        'Cabang Syiah Kuala' => 'Kantor Pusat',
+        'Cabang Teuku Umar' => 'Kantor Cabang Selatan',
+        'Cabang Sultan Iskandar Muda' => 'Kantor Cabang Selatan',
+        'Bagian PAL (Pengolahan Air Limbah)' => 'Kantor Bagian PAL',
+    ];
 
     /**
-     * Seed 30 hari terakhir absensi untuk seluruh pegawai yang sudah ada (Senin-Sabtu,
-     * Minggu diloncat). Jam kerja Senin-Jumat 08:00-16:30, Sabtu 08:00-12:00 — lihat
-     * plan.md §8.1. Variasi tepat waktu/terlambat/pulang cepat dan sebaran 3 lokasi
-     * kantor (§8.1.1) dibuat acak supaya tab Kehadiran punya data yang representatif.
+     * Seed 30 hari terakhir absensi untuk seluruh staf (Direksi dikecualikan — mereka tidak
+     * absen, sama seperti DashboardController yang sudah mengecualikan job_level 1 dari semua
+     * statistik). Senin-Sabtu, Minggu diloncat. Jam kerja Senin-Jumat 08:00-16:30, Sabtu
+     * 08:00-12:00 — lihat plan.md §8.1. "Kantor asal" tiap staf mengikuti departemennya
+     * (§8.1.1, lihat DEPARTMENT_LOCATIONS), bukan acak.
      */
     public function run(): void
     {
-        $locations = Location::whereIn('name', self::LOCATION_NAMES)->get();
-
-        if ($locations->isEmpty()) {
-            $locations = Location::all();
-        }
+        $locations = Location::all()->keyBy('name');
 
         if ($locations->isEmpty()) {
             $this->command?->warn('Belum ada lokasi kantor (Manajemen Kantor) — absensi diseed tanpa koordinat.');
         }
 
-        $users = User::all();
+        $users = User::where('job_level', '!=', 1)->get();
 
         foreach ($users as $user) {
-            $homeLocation = $locations->isNotEmpty() ? $locations[$user->id % $locations->count()] : null;
+            $homeLocation = $this->resolveHomeLocation($user, $locations);
 
             for ($daysAgo = 29; $daysAgo >= 0; $daysAgo--) {
                 $date = Carbon::today()->subDays($daysAgo);
@@ -54,12 +69,40 @@ class AttendanceSeeder extends Seeder
                     continue;
                 }
 
-                $this->seedDay($user, $date, $homeLocation);
+                $this->seedDay($user, $date, $homeLocation, $locations);
             }
         }
     }
 
-    private function seedDay(User $user, Carbon $date, ?Location $homeLocation): void
+    /**
+     * Departemen Seksi hanya boleh bersarang satu level di bawah Bagian/Cabang/SPI/PAL
+     * (Department::PARENT_TYPES) jadi satu hop ->parent cukup untuk sampai ke departemen
+     * top-level yang dipetakan di DEPARTMENT_LOCATIONS.
+     */
+    private function resolveHomeLocation(User $user, Collection $locations): ?Location
+    {
+        $department = $user->department;
+
+        if (! $department) {
+            return null;
+        }
+
+        $topDepartment = $department->type === 'SEKSI' ? $department->parent : $department;
+
+        if (! $topDepartment) {
+            return null;
+        }
+
+        if ($topDepartment->name === 'Bagian Produksi') {
+            return $locations->get($user->id % 2 === 0 ? 'WTP Siron' : 'WTP Lubok Batee');
+        }
+
+        $locationName = self::DEPARTMENT_LOCATIONS[$topDepartment->name] ?? null;
+
+        return $locationName ? $locations->get($locationName) : null;
+    }
+
+    private function seedDay(User $user, Carbon $date, ?Location $homeLocation, Collection $locations): void
     {
         $closeTime = $date->isSaturday() ? '12:00:00' : '16:30:00';
 
@@ -76,8 +119,22 @@ class AttendanceSeeder extends Seeder
         [$clockInLat, $clockInLong] = $homeLocation ? $this->pointFor($homeLocation, fake()->boolean(80)) : [null, null];
         [$clockOutLat, $clockOutLong] = $homeLocation ? $this->pointFor($homeLocation, fake()->boolean(80)) : [null, null];
 
+        $clockInMatched = $clockInLat !== null && $locations->contains(fn (Location $l) => $l->containsPoint($clockInLat, $clockInLong));
+        $clockOutMatched = $clockOutLat !== null && $locations->contains(fn (Location $l) => $l->containsPoint($clockOutLat, $clockOutLong));
+
         $status = $isLate ? 'TELAT' : ($isEarlyLeave ? 'PULANG_CEPAT' : 'HADIR');
         $isApel = $date->isMonday() && ! $isLate;
+
+        // Samakan dengan AttendanceController: needsApproval = telat/pulang cepat ATAU di luar
+        // seluruh lokasi kantor terdaftar (bukan cuma home location-nya).
+        $needsApproval = $isLate || $isEarlyLeave || ! $clockInMatched || ! $clockOutMatched;
+
+        $approvalReason = match (true) {
+            $isLate => fake()->randomElement(['Macet di jalan', 'Urusan keluarga', 'Kendaraan mogok', 'Antar anak sekolah']),
+            $isEarlyLeave => fake()->randomElement(['Antar anak sekolah', 'Urusan keluarga mendadak', 'Sakit ringan']),
+            $needsApproval => 'Absen di luar lokasi kantor terdaftar',
+            default => null,
+        };
 
         Attendance::factory()->create([
             'user_id' => $user->id,
@@ -90,12 +147,8 @@ class AttendanceSeeder extends Seeder
             'clock_out_long' => $clockOutLong,
             'is_apel' => $isApel,
             'status' => $status,
-            'approval_reason' => $isLate
-                ? fake()->randomElement(['Macet di jalan', 'Urusan keluarga', 'Kendaraan mogok', 'Antar anak sekolah'])
-                : ($isEarlyLeave ? fake()->randomElement(['Antar anak sekolah', 'Urusan keluarga mendadak', 'Sakit ringan']) : null),
-            // ponytail: koordinat luar-geofence sudah acak di seeder ini, tapi belum dikaitkan
-            // ke supervisor_approval di sini — tambahkan kalau butuh data uji utk kasus itu juga.
-            'supervisor_approval' => ($isLate || $isEarlyLeave) ? fake()->randomElement(['PENDING', 'APPROVED', 'REJECTED']) : 'APPROVED',
+            'approval_reason' => $approvalReason,
+            'supervisor_approval' => $needsApproval ? fake()->randomElement(['PENDING', 'APPROVED', 'REJECTED']) : 'APPROVED',
         ]);
     }
 

@@ -64,7 +64,7 @@ class KpiPlanController extends Controller
     public function update(Request $request, KpiPlan $plan)
     {
         abort_unless($plan->user_id === $request->user()->id, 403);
-        abort_unless($plan->status === 'DRAFT', 422, 'Hanya rencana berstatus DRAFT yang bisa diedit.');
+        abort_unless(in_array($plan->status, ['DRAFT', 'REJECTED'], true), 422, 'Hanya rencana berstatus DRAFT/REJECTED yang bisa diedit.');
         abort_unless($plan->period->isPlanningOpen(), 422, 'Periode KPI sedang tidak dalam masa pengajuan rencana kerja.');
 
         $data = $request->validate([
@@ -90,7 +90,7 @@ class KpiPlanController extends Controller
     public function destroy(Request $request, KpiPlan $plan)
     {
         abort_unless($plan->user_id === $request->user()->id, 403);
-        abort_unless($plan->status === 'DRAFT', 422, 'Hanya rencana berstatus DRAFT yang bisa dihapus.');
+        abort_unless(in_array($plan->status, ['DRAFT', 'REJECTED'], true), 422, 'Hanya rencana berstatus DRAFT/REJECTED yang bisa dihapus.');
         abort_unless($plan->period->isPlanningOpen(), 422, 'Periode KPI sedang tidak dalam masa pengajuan rencana kerja.');
 
         $plan->delete();
@@ -106,7 +106,7 @@ class KpiPlanController extends Controller
         abort_unless($period?->isPlanningOpen(), 422, 'Periode KPI sedang tidak dalam masa pengajuan rencana kerja.');
 
         $user = $request->user();
-        $plans = KpiPlan::where('user_id', $user->id)->where('period_id', $data['period_id'])->where('status', 'DRAFT');
+        $plans = KpiPlan::where('user_id', $user->id)->where('period_id', $data['period_id'])->whereIn('status', ['DRAFT', 'REJECTED']);
 
         if ($plans->count() === 0) {
             throw ValidationException::withMessages(['period_id' => ['Belum ada rencana kerja untuk disubmit.']]);

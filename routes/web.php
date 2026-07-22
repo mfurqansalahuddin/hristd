@@ -8,6 +8,7 @@ use App\Http\Controllers\Web\DinasLuarController;
 use App\Http\Controllers\Web\EmployeeController;
 use App\Http\Controllers\Web\JabatanController;
 use App\Http\Controllers\Web\KpiCategoryController;
+use App\Http\Controllers\Web\KpiFinalScoreController;
 use App\Http\Controllers\Web\KpiPeriodController;
 use App\Http\Controllers\Web\KpiViolationController;
 use App\Http\Controllers\Web\LocationController;
@@ -55,6 +56,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/kpi-categories', [KpiCategoryController::class, 'index'])->name('kpi-categories.index');
 
     Route::get('/kpi-violations', [KpiViolationController::class, 'index'])->name('kpi-violations.index');
+
+    Route::get('/kpi-final-scores', [KpiFinalScoreController::class, 'index'])->name('kpi-final-scores.index');
+    Route::get('/kpi-final-scores/export', [KpiFinalScoreController::class, 'export'])->name('kpi-final-scores.export');
 
     Route::get('/cuti', [CutiController::class, 'index'])->name('cuti.index');
     Route::get('/sakit', [SakitController::class, 'index'])->name('sakit.index');

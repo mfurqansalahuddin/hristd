@@ -33,6 +33,18 @@ test('hanya bisa edit rencana kerja berstatus DRAFT', function () {
     ])->assertStatus(422);
 });
 
+test('rencana kerja berstatus REJECTED bisa diedit lagi (alur ajukan ulang)', function () {
+    $period = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'DRAFT']);
+    $staf = User::factory()->create(['job_level' => 4]);
+    $plan = KpiPlan::create(['user_id' => $staf->id, 'period_id' => $period->id, 'name' => 'Nama', 'target_description' => 'A', 'weight' => 20, 'status' => 'REJECTED']);
+
+    $this->actingAs($staf, 'sanctum')->putJson("/api/kpi/plans/{$plan->id}", [
+        'name' => 'Nama', 'target_description' => 'A revisi', 'weight' => 25,
+    ])->assertOk();
+
+    expect($plan->fresh()->target_description)->toBe('A revisi');
+});
+
 test('user lain tidak bisa edit rencana kerja orang lain', function () {
     $period = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'DRAFT']);
     $owner = User::factory()->create(['job_level' => 4]);
@@ -64,6 +76,16 @@ test('hanya bisa hapus rencana kerja berstatus DRAFT', function () {
     expect(KpiPlan::find($plan->id))->not->toBeNull();
 });
 
+test('rencana kerja berstatus REJECTED bisa dihapus', function () {
+    $period = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'DRAFT']);
+    $staf = User::factory()->create(['job_level' => 4]);
+    $plan = KpiPlan::create(['user_id' => $staf->id, 'period_id' => $period->id, 'name' => 'Nama', 'target_description' => 'A', 'weight' => 20, 'status' => 'REJECTED']);
+
+    $this->actingAs($staf, 'sanctum')->deleteJson("/api/kpi/plans/{$plan->id}")->assertNoContent();
+
+    expect(KpiPlan::find($plan->id))->toBeNull();
+});
+
 test('user lain tidak bisa hapus rencana kerja orang lain', function () {
     $period = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'DRAFT']);
     $owner = User::factory()->create(['job_level' => 4]);
@@ -84,6 +106,18 @@ test('submit mengubah semua rencana DRAFT jadi SUBMITTED', function () {
     $this->actingAs($staf, 'sanctum')->postJson('/api/kpi/plans/submit', ['period_id' => $period->id])->assertOk();
 
     expect(KpiPlan::where('user_id', $staf->id)->where('status', 'SUBMITTED')->count())->toBe(2);
+});
+
+test('submit memproses rencana REJECTED juga, bukan cuma DRAFT (alur ajukan ulang)', function () {
+    $period = KpiPeriod::create(['month' => 7, 'year' => 2026, 'status' => 'DRAFT']);
+    $staf = User::factory()->create(['job_level' => 4]);
+    KpiPlan::create(['user_id' => $staf->id, 'period_id' => $period->id, 'name' => 'Nama', 'target_description' => 'A', 'weight' => 20, 'status' => 'DRAFT']);
+    $rejected = KpiPlan::create(['user_id' => $staf->id, 'period_id' => $period->id, 'name' => 'Nama', 'target_description' => 'B', 'weight' => 20, 'status' => 'REJECTED']);
+
+    $this->actingAs($staf, 'sanctum')->postJson('/api/kpi/plans/submit', ['period_id' => $period->id])->assertOk();
+
+    expect($rejected->fresh()->status)->toBe('SUBMITTED')
+        ->and(KpiPlan::where('user_id', $staf->id)->where('status', 'SUBMITTED')->count())->toBe(2);
 });
 
 test('self-assessment hanya bisa diisi kalau rencana sudah APPROVED', function () {

@@ -184,6 +184,55 @@
     </div>
 
     <div class="mb-6">
+        <x-common.component-card title="Band Persentase Gaji" desc="Realisasi skor KPI (grand total) -> persentase gaji. Hanya berlaku untuk periode BARU yang belum dibuka — periode yang sudah berjalan/CLOSED memakai snapshot bekunya sendiri, tidak ikut berubah.">
+            <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+                <div class="max-w-full overflow-x-auto custom-scrollbar">
+                    <table class="w-full min-w-[500px]">
+                        <thead>
+                            <tr class="border-b border-gray-100 dark:border-gray-800">
+                                <th class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Syarat Skor</p></th>
+                                <th class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Persentase Gaji</p></th>
+                                <th class="px-5 py-3 text-left sm:px-6"><p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Aksi</p></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($bandRows as $band)
+                                <tr wire:key="band-{{ $band->id }}" class="border-b border-gray-100 dark:border-gray-800">
+                                    <td class="px-5 py-4 sm:px-6">
+                                        @if ($band->min_score === null)
+                                            <span class="text-sm text-gray-400">Sisanya (skor terendah)</span>
+                                        @else
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm text-gray-500 dark:text-gray-400">Skor &gt;</span>
+                                                <input type="number" min="0" max="100" step="0.01" wire:model.live="bandEdits.{{ $band->id }}.min_score" value="{{ $bandEdits[$band->id]['min_score'] }}"
+                                                    class="dark:bg-dark-900 shadow-theme-xs h-9 w-24 rounded-lg border border-gray-300 bg-transparent px-3 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90" />
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="px-5 py-4 sm:px-6">
+                                        <div class="relative w-24">
+                                            <input type="number" min="0" max="100" wire:model.live="bandEdits.{{ $band->id }}.percentage" value="{{ $bandEdits[$band->id]['percentage'] }}"
+                                                class="dark:bg-dark-900 shadow-theme-xs h-9 w-full rounded-lg border border-gray-300 bg-transparent pr-6 pl-3 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90" />
+                                            <span class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-sm text-gray-400">%</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-5 py-4 sm:px-6">
+                                        <button type="button" wire:click="updateBandWeight({{ $band->id }})"
+                                            @disabled(! $this->isBandDirty($band->id))
+                                            class="text-sm {{ $this->isBandDirty($band->id) ? 'text-brand-500 hover:underline' : 'text-gray-300 dark:text-gray-600 cursor-not-allowed' }}">
+                                            Simpan
+                                        </button>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </x-common.component-card>
+    </div>
+
+    <div class="mb-6">
         <x-common.component-card title="Tambah Kategori Pengurang Integritas" desc="Tiap temuan tervalidasi dari salah satu dari 4 sumber Integritas pada kategori ini mengurangi skor kategori tsb sampai 0.">
             <form wire:submit="storeIntegrityCategory" class="flex flex-wrap items-end gap-4">
                 <div class="flex-1 min-w-[200px]">

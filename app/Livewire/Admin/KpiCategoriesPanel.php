@@ -6,6 +6,7 @@ use App\Models\KpiComponentWeight;
 use App\Models\KpiExtraCriterion;
 use App\Models\KpiIntegrityCategory;
 use App\Models\KpiIntegritySourceWeight;
+use App\Models\KpiSalaryBand;
 use Livewire\Component;
 
 class KpiCategoriesPanel extends Component
@@ -26,6 +27,10 @@ class KpiCategoriesPanel extends Component
     public array $sourceWeightEdits = [];
 
     public array $savedSourceWeightEdits = [];
+
+    public array $bandEdits = [];
+
+    public array $savedBandEdits = [];
 
     public array $criteriaEdits = [];
 
@@ -48,6 +53,7 @@ class KpiCategoriesPanel extends Component
         $this->syncEdits();
         $this->syncCriteriaEdits();
         $this->syncSourceWeightEdits();
+        $this->syncBandEdits();
     }
 
     public function weightsTotal(): int
@@ -130,6 +136,48 @@ class KpiCategoriesPanel extends Component
             ->toArray();
 
         $this->savedSourceWeightEdits = $this->sourceWeightEdits;
+    }
+
+    /**
+     * Band skor -> persentase gaji dipakai HRD, tapi cuma berlaku untuk periode BARU
+     * yang belum dibuka — periode yang sudah berjalan/CLOSED pakai snapshot bekunya
+     * sendiri (`KpiPeriod::weights_snapshot`), tidak ikut berubah kalau band ini diedit.
+     */
+    public function isBandDirty(int $bandId): bool
+    {
+        $current = $this->bandEdits[$bandId] ?? null;
+        $saved = $this->savedBandEdits[$bandId] ?? null;
+
+        if ($current === null || $saved === null) {
+            return $current !== $saved;
+        }
+
+        return (string) $current['min_score'] !== (string) $saved['min_score']
+            || (int) $current['percentage'] !== (int) $saved['percentage'];
+    }
+
+    public function updateBandWeight(int $bandId): void
+    {
+        $data = $this->validate([
+            "bandEdits.{$bandId}.min_score" => ['nullable', 'numeric', 'min:0', 'max:100'],
+            "bandEdits.{$bandId}.percentage" => ['required', 'integer', 'min:0', 'max:100'],
+        ]);
+
+        KpiSalaryBand::whereKey($bandId)->update($data['bandEdits'][$bandId]);
+        $this->savedBandEdits[$bandId] = $this->bandEdits[$bandId];
+
+        session()->flash('success', 'Band persentase gaji diperbarui — berlaku untuk periode baru berikutnya.');
+    }
+
+    private function syncBandEdits(): void
+    {
+        $this->bandEdits = KpiSalaryBand::orderByDesc('min_score')->get()
+            ->mapWithKeys(fn (KpiSalaryBand $band) => [
+                $band->id => ['min_score' => $band->min_score, 'percentage' => $band->percentage],
+            ])
+            ->toArray();
+
+        $this->savedBandEdits = $this->bandEdits;
     }
 
     public function storeIntegrityCategory(): void
@@ -281,6 +329,7 @@ class KpiCategoriesPanel extends Component
         return view('livewire.admin.kpi-categories-panel', [
             'weightRows' => KpiComponentWeight::all()->sortBy(fn (KpiComponentWeight $row) => $order[$row->component] ?? 99)->values(),
             'sourceWeightRows' => KpiIntegritySourceWeight::all()->sortBy(fn (KpiIntegritySourceWeight $row) => $sourceOrder[$row->source] ?? 99)->values(),
+            'bandRows' => KpiSalaryBand::orderByDesc('min_score')->get(),
         ]);
     }
 }

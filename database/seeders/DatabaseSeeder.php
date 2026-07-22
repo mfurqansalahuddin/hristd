@@ -8,14 +8,26 @@ use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
+    private RealEmployeeSeeder $realEmployees;
+
+    private RealStaffSeeder $realStaff;
+
+    public function __construct()
+    {
+        $this->realEmployees = new RealEmployeeSeeder;
+        $this->realStaff = new RealStaffSeeder;
+    }
+
     /**
      * Seed the application's database.
      *
      * Membangun pohon organisasi riil Perumdam Tirta Daroy sesuai plan.md §3.1:
      * 3 Direksi, seluruh Bagian/Cabang/Unit/SPI/PAL/Staf Ahli + Seksi terisi penuh
-     * (tidak ada Kabag/Kasi kosong di seeder ini), dan jumlah Staf per Seksi
-     * dibuat bervariasi (1, 2, 3, 4) untuk menutupi kasus solo, mutual (2 orang),
-     * dan siklik (≥3 orang) di aturan rekan sejawat §5.3.
+     * (tidak ada Kabag/Kasi kosong di seeder ini), diisi nama pejabat riil lewat
+     * RealEmployeeSeeder dan sisanya (staf level 4, seksi yang belum ada datanya)
+     * tetap factory random supaya jumlah staf per Seksi bervariasi (1, 2, 3, 4)
+     * untuk menutupi kasus solo, mutual (2 orang), dan siklik (≥3 orang) di aturan
+     * rekan sejawat §5.3.
      */
     public function run(): void
     {
@@ -30,12 +42,9 @@ class DatabaseSeeder extends Seeder
             'parent_department_id' => $direkturUtama->id, 'directorate' => 'TEKNIK',
         ]);
 
-        User::factory()->create([
-            'name' => 'Direktur Utama', 'username' => 'direktur.utama', 'email' => 'direktur.utama@tirtadaroy.id',
-            'department_id' => $direkturUtama->id, 'job_level' => 1, 'is_admin' => true,
-        ]);
-        User::factory()->create(['department_id' => $direkturAdm->id, 'job_level' => 1]);
-        User::factory()->create(['department_id' => $direkturTeknik->id, 'job_level' => 1]);
+        $this->realEmployees->makeUser($direkturUtama, 1, 'SUPER_ADMIN');
+        $this->realEmployees->makeUser($direkturAdm, 1);
+        $this->realEmployees->makeUser($direkturTeknik, 1);
 
         $bagianDefs = [
             ['parent' => $direkturAdm, 'name' => 'Bagian Keuangan', 'type' => 'BAGIAN', 'seksi' => ['Seksi Anggaran', 'Seksi Kas/Gaji', 'Seksi Akuntansi']],
@@ -67,7 +76,7 @@ class DatabaseSeeder extends Seeder
                 'parent_department_id' => $def['parent']->id,
             ]);
 
-            User::factory()->create(['department_id' => $bagian->id, 'job_level' => 2]);
+            $this->realEmployees->makeUser($bagian, 2);
 
             foreach ($def['seksi'] as $seksiName) {
                 $seksi = Department::create([
@@ -76,19 +85,22 @@ class DatabaseSeeder extends Seeder
                     'parent_department_id' => $bagian->id,
                 ]);
 
-                User::factory()->create(['department_id' => $seksi->id, 'job_level' => 3]);
+                $this->realEmployees->makeUser($seksi, 3);
 
-                $staffCount = $staffCountCycle[$cycleIndex % count($staffCountCycle)];
-                $cycleIndex++;
-                User::factory($staffCount)->create(['department_id' => $seksi->id, 'job_level' => 4]);
+                if ($this->realStaff->makeUsersFor($seksi) === 0) {
+                    $staffCount = $staffCountCycle[$cycleIndex % count($staffCountCycle)];
+                    $cycleIndex++;
+                    User::factory($staffCount)->create(['department_id' => $seksi->id, 'job_level' => 4]);
+                }
             }
 
-            if ($def['type'] === 'UNIT') {
+            if ($def['type'] === 'UNIT' && $this->realStaff->makeUsersFor($bagian) === 0) {
                 // Kasus solo: staf melekat langsung ke Unit, tanpa Kasi (§3.3).
                 User::factory()->create(['department_id' => $bagian->id, 'job_level' => 4]);
             }
         }
 
+        $this->call(LocationSeeder::class);
         $this->call(AttendanceSeeder::class);
         $this->call(KpiEvaluatorWeightSeeder::class);
     }

@@ -29,7 +29,7 @@ class User extends Authenticatable
         'instansi',
         'employment_status',
         'leave_balance',
-        'is_admin',
+        'role',
         'photo_path',
     ];
 
@@ -53,8 +53,30 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'is_admin' => 'boolean',
         ];
+    }
+
+    /** SUPER_ADMIN: IT & Kepala Bagian Umum. ADMIN_KEPEGAWAIAN: HRD. STAFF (default): akses cuma mobile. */
+    public const ROLE_SUPER_ADMIN = 'SUPER_ADMIN';
+
+    public const ROLE_ADMIN_KEPEGAWAIAN = 'ADMIN_KEPEGAWAIAN';
+
+    public const ROLE_STAFF = 'STAFF';
+
+    public const ROLE_LABELS = [
+        self::ROLE_SUPER_ADMIN => 'Super Admin',
+        self::ROLE_ADMIN_KEPEGAWAIAN => 'Admin Kepegawaian',
+        self::ROLE_STAFF => 'Staff (akses mobile saja)',
+    ];
+
+    public function canAccessAdminPanel(): bool
+    {
+        return in_array($this->role, [self::ROLE_SUPER_ADMIN, self::ROLE_ADMIN_KEPEGAWAIAN], true);
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === self::ROLE_SUPER_ADMIN;
     }
 
     public const JOB_LEVEL_LABELS = [

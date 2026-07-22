@@ -3,14 +3,11 @@
 namespace App\Services;
 
 use App\Models\Attendance;
-use App\Models\KpiComponentWeight;
-use App\Models\KpiEvaluatorWeight;
 use App\Models\KpiExtraCriterion;
 use App\Models\KpiExtraCriterionScore;
 use App\Models\KpiFinalScore;
 use App\Models\KpiIntegrityCategory;
 use App\Models\KpiIntegrityEvaluation;
-use App\Models\KpiIntegritySourceWeight;
 use App\Models\KpiPeriod;
 use App\Models\KpiPlan;
 use App\Models\User;
@@ -21,6 +18,12 @@ use App\Models\ViolationReport;
  * penilaian tambahan aktif (`kpi_extra_criteria`, 2026-07-16) saat periode
  * ditutup (Fase C). Dipanggil dari KpiPeriodsTable::updateStatus() saat
  * status -> CLOSED.
+ *
+ * Bobot komponen/evaluator/integritas/band gaji dibaca dari
+ * `$period->weights_snapshot` (dibekukan saat periode dibuat, lihat
+ * `KpiPeriod::buildWeightsSnapshot()`) — bukan dari tabel master live, supaya
+ * edit master data belakangan tidak ikut mengubah periode yang sudah
+ * berjalan/CLOSED.
  *
  * ponytail: dijalankan sinkron per periode (job kecil, ~ratusan pegawai) —
  * pindah ke queued job kalau jumlah pegawai membesar jauh dari skala saat ini.
@@ -35,22 +38,19 @@ class KpiEvaluationService
 
     public function calculateForPeriod(KpiPeriod $period): void
     {
-        $weights = KpiComponentWeight::pluck('weight', 'component');
-
-        User::whereIn('job_level', self::EVALUATED_JOB_LEVELS)->each(function (User $user) use ($period, $weights) {
-            $this->calculateForUser($user, $period, $weights);
-        });
+        User::whereIn('job_level', self::EVALUATED_JOB_LEVELS)
+            ->each(function (User $user) use ($period) {
+                $this->calculateForUser($user, $period);
+            });
     }
 
-    public function calculateForUser(User $user, KpiPeriod $period, ?\Illuminate\Support\Collection $weights = null): KpiFinalScore
+    public function calculateForUser(User $user, KpiPeriod $period): KpiFinalScore
     {
-        $weights ??= KpiComponentWeight::pluck('weight', 'component');
-
-        $scoreKinerja = $this->kinerjaScore($user, $period, (int) ($weights['KINERJA'] ?? 50));
-        $scoreKehadiran = $this->kehadiranScore($user, $period, (int) ($weights['KEHADIRAN'] ?? 20));
-        $scoreApel = $this->apelScore($user, $period, (int) ($weights['APEL'] ?? 5));
-        $scorePakaian = $this->pakaianScore($user, $period, (int) ($weights['PAKAIAN_DINAS'] ?? 5));
-        $scoreIntegritas = $this->integritasScore($user, $period, (int) ($weights['INTEGRITAS'] ?? 20));
+        $scoreKinerja = $this->kinerjaScore($user, $period, $period->componentWeight('KINERJA', 50));
+        $scoreKehadiran = $this->kehadiranScore($user, $period, $period->componentWeight('KEHADIRAN', 20));
+        $scoreApel = $this->apelScore($user, $period, $period->componentWeight('APEL', 5));
+        $scorePakaian = $this->pakaianScore($user, $period, $period->componentWeight('PAKAIAN_DINAS', 5));
+        $scoreIntegritas = $this->integritasScore($user, $period, $period->componentWeight('INTEGRITAS', 20));
 
         $grandTotal = $scoreKinerja + $scoreKehadiran + $scoreApel + $scorePakaian + $scoreIntegritas;
 
@@ -70,6 +70,7 @@ class KpiEvaluationService
                 'score_pakaian' => $scorePakaian,
                 'score_integritas' => $scoreIntegritas,
                 'grand_total_score' => $grandTotal,
+                'salary_percentage' => $period->salaryPercentageFor($grandTotal),
             ]
         );
 
@@ -88,7 +89,7 @@ class KpiEvaluationService
      */
     private function extraCriterionScore(User $user, KpiPeriod $period, KpiExtraCriterion $criterion): float
     {
-        $evaluatorWeights = KpiEvaluatorWeight::where('job_level', $user->job_level)->pluck('weight', 'slot');
+        $evaluatorWeights = $period->evaluatorWeights((int) $user->job_level);
 
         $scores = KpiExtraCriterionScore::where('kpi_extra_criterion_id', $criterion->id)
             ->where('user_id', $user->id)
@@ -106,8 +107,8 @@ class KpiEvaluationService
 
     /**
      * §5: skor tiap target rencana kerja = rata-rata tertimbang skor 3 penilai
-     * (bobot dari kpi_evaluator_weights), lalu dikalikan bobot item (weight,
-     * skala 0-50) untuk dapat kontribusinya ke bucket Kinerja (50%).
+     * (bobot dari snapshot periode), lalu dikalikan bobot item (weight, skala
+     * 0-50) untuk dapat kontribusinya ke bucket Kinerja (50%).
      */
     private function kinerjaScore(User $user, KpiPeriod $period, int $componentWeight): float
     {
@@ -121,7 +122,7 @@ class KpiEvaluationService
             return 0.0;
         }
 
-        $evaluatorWeights = KpiEvaluatorWeight::where('job_level', $user->job_level)->pluck('weight', 'slot');
+        $evaluatorWeights = $period->evaluatorWeights((int) $user->job_level);
 
         $total = $plans->sum(function (KpiPlan $plan) use ($evaluatorWeights) {
             $planScore = $plan->evaluations->sum(function ($evaluation) use ($evaluatorWeights) {
@@ -138,12 +139,17 @@ class KpiEvaluationService
         return round(min($total, $componentWeight), 2);
     }
 
-    /** §7 poin 2 & §8.2-8.4: rasio hari hadir (Cuti/Sakit/DL approved dianggap hadir 100%, bukan Alpa). */
+    /**
+     * §7 poin 2 & §8.2-8.4: rasio hari hadir (Cuti/Sakit/DL approved dianggap hadir 100%,
+     * bukan Alpa). Dihitung Senin-Jumat saja (dikonfirmasi user) — baik denominator maupun
+     * numerator dibatasi ke tanggal yang sama (`workingDaysDates()`), supaya absensi Sabtu
+     * tidak ikut menaikkan rasio (Sabtu di luar cakupan Kehadiran bulanan).
+     */
     private function kehadiranScore(User $user, KpiPeriod $period, int $componentWeight): float
     {
-        $workingDays = $this->workingDaysIn($period);
+        $workingDays = $this->workingDaysDates($period);
 
-        if ($workingDays === 0) {
+        if ($workingDays === []) {
             return 0.0;
         }
 
@@ -151,9 +157,11 @@ class KpiEvaluationService
             ->whereYear('date', $period->year)
             ->whereMonth('date', $period->month)
             ->where('status', '!=', 'ALPA')
+            ->get()
+            ->filter(fn (Attendance $attendance) => ! $attendance->date->isSaturday() && ! $attendance->date->isSunday())
             ->count();
 
-        return round(min($hadirDays / $workingDays, 1) * $componentWeight, 2);
+        return round(min($hadirDays / count($workingDays), 1) * $componentWeight, 2);
     }
 
     /** §7 poin 3: rasio Senin ber-is_apel=true dibagi total Senin dalam periode. */
@@ -194,8 +202,8 @@ class KpiEvaluationService
 
     /**
      * §7.1: Integritas kini 4 sumber berbobot (default 25/25/25/25,
-     * `kpi_integrity_source_weights`) — Penilai 1/2/3 (review wajib per
-     * kategori, `kpi_integrity_evaluations`) + Aduan Perusahaan (company-wide,
+     * snapshot periode) — Penilai 1/2/3 (review wajib per kategori,
+     * `kpi_integrity_evaluations`) + Aduan Perusahaan (company-wide,
      * `violation_reports` category=INTEGRITAS). Tiap sumber dihitung skornya
      * sendiri lewat formula yang sama: 8 sub-kategori, tiap kategori mulai
      * dari skor penuh (`deduction_value`-nya sendiri), nol total kalau ada
@@ -233,7 +241,7 @@ class KpiEvaluationService
                 ->where('kpi_integrity_category_id', $c->id)->where('evaluator_role', 'PENILAI_3')->isNotEmpty()),
         ];
 
-        $sourceWeights = KpiIntegritySourceWeight::pluck('weight', 'source');
+        $sourceWeights = $period->integritySourceWeights();
         $weighted = collect($sourceScores)->map(fn (float $score, string $source) => $score * ($sourceWeights[$source] ?? 0) / 100)->sum();
 
         return round(min($weighted, 100) / 100 * $componentWeight, 2);
@@ -248,12 +256,7 @@ class KpiEvaluationService
         return $max === 0 ? 0.0 : $remaining / $max * 100;
     }
 
-    private function workingDaysIn(KpiPeriod $period): int
-    {
-        return count($this->workingDaysDates($period));
-    }
-
-    /** Hari kerja Senin-Sabtu dalam 1 bulan periode (Minggu diloncat, §8.1.1 AttendanceSeeder). */
+    /** Hari kerja Senin-Jumat dalam 1 bulan periode (Sabtu & Minggu dilewati). */
     private function workingDaysDates(KpiPeriod $period): array
     {
         $start = \Illuminate\Support\Carbon::create($period->year, $period->month, 1)->startOfMonth();
