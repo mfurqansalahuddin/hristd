@@ -112,7 +112,7 @@
                 </div>
 
                 <div class="max-w-full overflow-x-auto custom-scrollbar">
-                    <table class="w-full min-w-[700px]">
+                    <table class="w-full min-w-[900px]">
                         <thead>
                             <tr class="border-b border-gray-100 dark:border-gray-800">
                                 <x-common.data-table.th label="Periode" />

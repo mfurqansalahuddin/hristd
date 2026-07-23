@@ -57,6 +57,7 @@ class KpiFinalScoresTable extends Component
     public function selectUser(int $userId): void
     {
         $this->selectedUserId = $userId;
+        $this->search = '';
         $this->resetPage();
     }
 
