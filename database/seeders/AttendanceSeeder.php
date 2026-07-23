@@ -161,7 +161,7 @@ class AttendanceSeeder extends Seeder
      *
      * @return array{0: float, 1: float}
      */
-    private function pointFor(Location $location, bool $insideOffice): array
+    protected function pointFor(Location $location, bool $insideOffice): array
     {
         [$centerLat, $centerLong] = $this->centerOf($location);
 

@@ -25,18 +25,12 @@ Route::post('/signin', [AuthController::class, 'login'])->name('signin.store');
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
-// error pages
-Route::get('/error-404', function () {
-    return view('pages.errors.error-404', ['title' => 'Error 404']);
-})->name('error-404');
-
-Route::get('/error-500', function () {
-    return view('pages.errors.error-500', ['title' => 'Error 500']);
-})->name('error-500');
-
-Route::get('/error-503', function () {
-    return view('pages.errors.error-503', ['title' => 'Error 503']);
-})->name('error-503');
+// error pages (preview routes; real exceptions auto-render resources/views/errors/*)
+Route::get('/error-403', fn () => view('errors.403'))->name('error-403');
+Route::get('/error-404', fn () => view('errors.404'))->name('error-404');
+Route::get('/error-419', fn () => view('errors.419'))->name('error-419');
+Route::get('/error-500', fn () => view('errors.500'))->name('error-500');
+Route::get('/error-503', fn () => view('errors.503'))->name('error-503');
 
 // panel HRD (khusus admin)
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function () {
