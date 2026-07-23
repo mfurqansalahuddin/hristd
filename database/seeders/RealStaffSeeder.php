@@ -323,6 +323,7 @@ class RealStaffSeeder
                 'nik' => $nik,
                 'username' => $username,
                 'email' => "{$username}@tirtadaroy.id",
+                'instansi' => \in_array($status, ['PRAMAGANG', 'MAGANG', 'KONTRAK'], true) ? 'KOPKARTIRDA' : 'PERUMDAM_TD',
                 'employment_status' => $status,
             ]);
         }

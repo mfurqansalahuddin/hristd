@@ -17,27 +17,26 @@
     </div>
 
     @if ($mode === 'periode')
-        <div class="mb-6 flex flex-wrap items-end gap-4">
-            <div>
-                <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Periode</label>
-                <select wire:model.live="periodId"
-                    class="dark:bg-dark-900 shadow-theme-xs h-11 w-48 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
-                    @foreach ($periods as $period)
-                        <option value="{{ $period->id }}">{{ $period->month }}/{{ $period->year }} ({{ $period->status }})</option>
-                    @endforeach
-                </select>
-            </div>
-            @if ($periodId)
-                <a href="{{ route('admin.kpi-final-scores.export', ['period_id' => $periodId]) }}"
-                    class="inline-flex items-center justify-center rounded-lg bg-white px-5 py-3.5 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700">
-                    Export CSV
-                </a>
-            @endif
-        </div>
-
         <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]" wire:loading.class="opacity-60">
-            <div class="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:flex-wrap sm:items-end sm:p-6 dark:border-gray-800">
-                <x-common.data-table.per-page-select :options="$perPageOptions" />
+            <div class="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:p-6 dark:border-gray-800">
+                <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                    <div>
+                        <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">Periode</label>
+                        <select wire:model.live="periodId"
+                            class="dark:bg-dark-900 shadow-theme-xs h-11 w-48 rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:text-white/90">
+                            @foreach ($periods as $period)
+                                <option value="{{ $period->id }}">{{ $period->month }}/{{ $period->year }} ({{ $period->status }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <x-common.data-table.per-page-select :options="$perPageOptions" />
+                </div>
+                @if ($periodId)
+                    <a href="{{ route('admin.kpi-final-scores.export', ['period_id' => $periodId]) }}"
+                        class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-white px-5 py-3.5 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:w-auto dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700">
+                        Export CSV
+                    </a>
+                @endif
             </div>
 
             <div class="max-w-full overflow-x-auto custom-scrollbar">
@@ -108,6 +107,10 @@
             <h3 class="mb-3 text-lg font-medium text-gray-800 dark:text-white/90">Riwayat Skor: {{ $selectedUser->name }}</h3>
 
             <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]" wire:loading.class="opacity-60">
+                <div class="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:flex-wrap sm:items-end sm:p-6 dark:border-gray-800">
+                    <x-common.data-table.per-page-select :options="$perPageOptions" />
+                </div>
+
                 <div class="max-w-full overflow-x-auto custom-scrollbar">
                     <table class="w-full min-w-[700px]">
                         <thead>

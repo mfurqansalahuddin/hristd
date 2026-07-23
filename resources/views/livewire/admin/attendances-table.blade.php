@@ -16,7 +16,7 @@
             <div class="w-full sm:w-44" wire:ignore x-on:date-change="$wire.set('date', $event.detail.dateStr)">
                 <x-form.date-picker id="attendance-date" label="Tanggal" :default-date="$date" date-format="Y-m-d" />
             </div>
-            @if ($location || $statusMasuk || $statusPulang || $search || $date !== now()->toDateString())
+            @if ($location || $statusMasuk || $statusPulang || $approval || $search || $date !== now()->toDateString())
                 <button type="button" wire:click="resetFilters" class="text-sm text-gray-500 hover:underline sm:mb-3 dark:text-gray-400">Reset</button>
             @endif
         </div>
@@ -65,9 +65,15 @@
                                 <option value="CEPAT">Pulang Cepat</option>
                             </select>
                         </x-common.data-table.th>
-                        <th class="px-5 py-3 text-left sm:px-6">
-                            <p class="font-medium text-gray-500 text-theme-xs dark:text-gray-400">Approval HR</p>
-                        </th>
+                        <x-common.data-table.th label="Approval HR" :active="$approval !== ''">
+                            <select wire:model.live="approval"
+                                class="dark:bg-dark-900 shadow-theme-xs w-full rounded-lg border border-gray-300 bg-transparent px-2 py-1.5 text-xs text-gray-800 dark:border-gray-700 dark:text-white/90">
+                                <option value="">- Semua -</option>
+                                <option value="APPROVED">Disetujui</option>
+                                <option value="REJECTED">Ditolak</option>
+                                <option value="PENDING">Perlu Aproval</option>
+                            </select>
+                        </x-common.data-table.th>
                     </tr>
                 </thead>
                 <tbody>

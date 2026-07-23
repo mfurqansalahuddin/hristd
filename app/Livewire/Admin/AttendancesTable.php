@@ -31,6 +31,9 @@ class AttendancesTable extends Component
     #[Url(history: true)]
     public string $statusPulang = '';
 
+    #[Url(history: true)]
+    public string $approval = '';
+
     public function mount(): void
     {
         if ($this->date === '') {
@@ -63,9 +66,14 @@ class AttendancesTable extends Component
         $this->resetPage();
     }
 
+    public function updatedApproval(): void
+    {
+        $this->resetPage();
+    }
+
     public function resetFilters(): void
     {
-        $this->reset(['search', 'location', 'statusMasuk', 'statusPulang']);
+        $this->reset(['search', 'location', 'statusMasuk', 'statusPulang', 'approval']);
         $this->date = now()->toDateString();
         $this->resetPage();
 
@@ -115,6 +123,7 @@ class AttendancesTable extends Component
             ->filter(fn (Attendance $attendance) => $this->matchesLocationFilter($attendance, $locations))
             ->filter(fn (Attendance $attendance) => $this->matchesStatusMasukFilter($attendance))
             ->filter(fn (Attendance $attendance) => $this->matchesStatusPulangFilter($attendance))
+            ->filter(fn (Attendance $attendance) => $this->matchesApprovalFilter($attendance, $locations))
             ->sortBy(
                 fn (Attendance $attendance) => $sort === 'name' ? $attendance->user?->name : $attendance->{$sort},
                 SORT_REGULAR,
@@ -182,5 +191,23 @@ class AttendancesTable extends Component
             'CEPAT' => $attendance->statusPulang() === 'CEPAT',
             default => true,
         };
+    }
+
+    private function matchesApprovalFilter(Attendance $attendance, Collection $locations): bool
+    {
+        if ($this->approval === '') {
+            return true;
+        }
+
+        if ($this->approval === 'PENDING') {
+            $needsApproval = $attendance->statusMasuk() === 'TERLAMBAT'
+                || $attendance->statusPulang() === 'CEPAT'
+                || ($attendance->clock_in && ! $attendance->matchedLocation('clock_in', $locations))
+                || ($attendance->clock_out && ! $attendance->matchedLocation('clock_out', $locations));
+
+            return $needsApproval && $attendance->supervisor_approval === 'PENDING';
+        }
+
+        return $attendance->supervisor_approval === $this->approval;
     }
 }

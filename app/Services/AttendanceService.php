@@ -18,7 +18,7 @@ class AttendanceService
      */
     public static function workingDaysBetween(Carbon $start, Carbon $end): Collection
     {
-        return collect(CarbonPeriod::create($start, $end))->filter(fn ($date) => ! $date->isSunday() && ! $date->isSaturday())->values();
+        return collect(CarbonPeriod::create($start, $end))->filter(fn (Carbon $date) => ! $date->isSunday() && ! $date->isSaturday())->values();
     }
 
     /**

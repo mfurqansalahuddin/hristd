@@ -8,7 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 test('kehadiran page shows status and lokasi badges computed from koordinat', function () {
-    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
+    $admin = User::factory()->createOne(['role' => 'ADMIN_KEPEGAWAIAN']);
     $office = Location::create([
         'name' => 'Kantor Pusat',
         'type' => 'RADIUS',
@@ -53,7 +53,7 @@ test('kehadiran page shows status and lokasi badges computed from koordinat', fu
 });
 
 test('filter status terlambat hanya menampilkan pegawai yang terlambat', function () {
-    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
+    $admin = User::factory()->createOne(['role' => 'ADMIN_KEPEGAWAIAN']);
 
     $onTime = User::factory()->create(['name' => 'Budi Ontime']);
     Attendance::factory()->create(['user_id' => $onTime->id, 'date' => '2026-07-14', 'clock_in' => '2026-07-14 07:45:00']);
@@ -69,7 +69,7 @@ test('filter status terlambat hanya menampilkan pegawai yang terlambat', functio
 });
 
 test('search kehadiran menyaring berdasarkan nama atau NIK', function () {
-    $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
+    $admin = User::factory()->createOne(['role' => 'ADMIN_KEPEGAWAIAN']);
 
     $budi = User::factory()->create(['name' => 'Budi Ontime', 'nik' => '1001']);
     Attendance::factory()->create(['user_id' => $budi->id, 'date' => '2026-07-14']);

@@ -67,7 +67,7 @@ test('locations table paginates and deletes without a redirect', function () {
 test('attendances table filters by status realtime', function () {
     $admin = User::factory()->create(['role' => 'ADMIN_KEPEGAWAIAN']);
     $onTime = User::factory()->create(['name' => 'Budi Ontime']);
-    Attendance::factory()->create(['user_id' => $onTime->id, 'date' => '2026-07-14', 'clock_in' => '2026-07-14 07:45:00']);
+    Attendance::factory()->create(['user_id' => $onTime->id, 'date' => '2026-07-14', 'clock_in' => '2026-07-14 07:45:00', 'supervisor_approval' => 'APPROVED']);
     $late = User::factory()->create(['name' => 'Siti Telat']);
     Attendance::factory()->create(['user_id' => $late->id, 'date' => '2026-07-14', 'clock_in' => '2026-07-14 08:30:00']);
 
@@ -76,6 +76,10 @@ test('attendances table filters by status realtime', function () {
         ->assertSee('Budi Ontime')
         ->assertSee('Siti Telat')
         ->set('statusMasuk', 'TERLAMBAT')
+        ->assertSee('Siti Telat')
+        ->assertDontSee('Budi Ontime')
+        ->set('statusMasuk', '')
+        ->set('approval', 'PENDING')
         ->assertSee('Siti Telat')
         ->assertDontSee('Budi Ontime')
         ->assertNoRedirect();
