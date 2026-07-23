@@ -79,7 +79,7 @@ class AttendanceSeeder extends Seeder
      * (Department::PARENT_TYPES) jadi satu hop ->parent cukup untuk sampai ke departemen
      * top-level yang dipetakan di DEPARTMENT_LOCATIONS.
      */
-    private function resolveHomeLocation(User $user, Collection $locations): ?Location
+    protected function resolveHomeLocation(User $user, Collection $locations): ?Location
     {
         $department = $user->department;
 
@@ -102,7 +102,7 @@ class AttendanceSeeder extends Seeder
         return $locationName ? $locations->get($locationName) : null;
     }
 
-    private function seedDay(User $user, Carbon $date, ?Location $homeLocation, Collection $locations): void
+    protected function seedDay(User $user, Carbon $date, ?Location $homeLocation, Collection $locations): void
     {
         $closeTime = $date->isSaturday() ? '12:00:00' : '16:30:00';
 
