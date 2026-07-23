@@ -8,6 +8,7 @@ use App\Models\KpiExtraCriterionScore;
 use App\Models\KpiFinalScore;
 use App\Models\KpiIntegrityCategory;
 use App\Models\KpiIntegrityEvaluation;
+use App\Models\KpiMandatoryEventParticipant;
 use App\Models\KpiPeriod;
 use App\Models\KpiPlan;
 use App\Models\User;
@@ -164,22 +165,30 @@ class KpiEvaluationService
         return round(min($hadirDays / count($workingDays), 1) * $componentWeight, 2);
     }
 
-    /** §7 poin 3: rasio Senin ber-is_apel=true dibagi total Senin dalam periode. */
+    /**
+     * §1.4.2 (revisi 2026-07-23, ganti logika Senin/is_apel lama): rasio partisipasi
+     * kpi_mandatory_events dalam periode. numerator = HADIR + TELAT (selalu kredit
+     * penuh, approval Telat cuma anotasi — tidak menggerbang skor) + TIDAK_HADIR yang
+     * alasannya APPROVED. Baris peserta yang belum ditandai (status null) otomatis
+     * tidak dapat kredit, sama seperti Tidak Hadir tanpa approval. Denominator 0
+     * (belum ada event untuk pegawai ini di periode ini) -> skor penuh, sesuai draf
+     * desain — bukan hasil meniru apelScore/kehadiranScore lama yang justru 0.0 di
+     * kondisi itu.
+     */
     private function apelScore(User $user, KpiPeriod $period, int $componentWeight): float
     {
-        $totalSenin = collect($this->workingDaysDates($period))->filter(fn ($date) => $date->isMonday())->count();
+        $participants = KpiMandatoryEventParticipant::where('user_id', $user->id)
+            ->whereHas('event', fn ($query) => $query->whereYear('date', $period->year)->whereMonth('date', $period->month))
+            ->get();
 
-        if ($totalSenin === 0) {
-            return 0.0;
+        if ($participants->isEmpty()) {
+            return round($componentWeight, 2);
         }
 
-        $apelCount = Attendance::where('user_id', $user->id)
-            ->whereYear('date', $period->year)
-            ->whereMonth('date', $period->month)
-            ->where('is_apel', true)
-            ->count();
+        $numerator = $participants->filter(fn (KpiMandatoryEventParticipant $p) => in_array($p->status, ['HADIR', 'TELAT'], true)
+            || ($p->status === 'TIDAK_HADIR' && $p->approval_status === 'APPROVED'))->count();
 
-        return round(min($apelCount / $totalSenin, 1) * $componentWeight, 2);
+        return round(min($numerator / $participants->count(), 1) * $componentWeight, 2);
     }
 
     /**

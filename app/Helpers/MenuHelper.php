@@ -18,6 +18,7 @@ class MenuHelper
                 'subItems' => [
                     ['name' => 'Data Pegawai', 'path' => '/admin/employees'],
                     ['name' => 'Manajemen Jabatan', 'path' => '/admin/jabatan'],
+                    ['name' => 'Permintaan Hapus Akun', 'path' => '/admin/deletion-requests'],
                 ],
             ],
             [
@@ -44,6 +45,7 @@ class MenuHelper
                 'name' => 'Absensi',
                 'subItems' => [
                     ['name' => 'Kehadiran', 'path' => '/admin/attendances'],
+                    ['name' => 'Apel & Kegiatan', 'path' => '/admin/apel-kegiatan'],
                     ['name' => 'Manajemen Kantor', 'path' => '/admin/locations'],
                 ],
             ],

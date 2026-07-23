@@ -125,6 +125,38 @@
                     }
                 }
             });
+
+            Alpine.store('confirmDialog', {
+                isOpen: false,
+                title: 'Konfirmasi',
+                message: '',
+                confirmText: 'Hapus',
+                cancelText: 'Batal',
+                variant: 'danger',
+                _onConfirm: null,
+
+                open({ title = 'Konfirmasi', message, confirmText = 'Hapus', cancelText = 'Batal', variant = 'danger', onConfirm }) {
+                    this.title = title;
+                    this.message = message;
+                    this.confirmText = confirmText;
+                    this.cancelText = cancelText;
+                    this.variant = variant;
+                    this._onConfirm = onConfirm;
+                    this.isOpen = true;
+                },
+
+                confirm() {
+                    const callback = this._onConfirm;
+                    this.isOpen = false;
+                    this._onConfirm = null;
+                    if (callback) callback();
+                },
+
+                cancel() {
+                    this.isOpen = false;
+                    this._onConfirm = null;
+                }
+            });
         });
     </script>
 
@@ -168,6 +200,8 @@
         </div>
 
     </div>
+
+    <x-ui.confirm-dialog />
 
 </body>
 

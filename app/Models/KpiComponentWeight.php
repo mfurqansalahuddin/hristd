@@ -11,7 +11,7 @@ class KpiComponentWeight extends Model
     public const LABELS = [
         'KINERJA' => 'Kinerja Teknis',
         'KEHADIRAN' => 'Kehadiran',
-        'APEL' => 'Apel Pagi',
+        'APEL' => 'Apel & Kegiatan',
         'PAKAIAN_DINAS' => 'Pakaian Dinas',
         'INTEGRITAS' => 'Integritas',
     ];

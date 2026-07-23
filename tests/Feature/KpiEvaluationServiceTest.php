@@ -7,6 +7,8 @@ use App\Models\KpiEvaluatorWeight;
 use App\Models\KpiExtraCriterion;
 use App\Models\KpiExtraCriterionScore;
 use App\Models\KpiIntegrityCategory;
+use App\Models\KpiMandatoryEvent;
+use App\Models\KpiMandatoryEventParticipant;
 use App\Models\KpiPeriod;
 use App\Models\KpiPlan;
 use App\Models\User;
@@ -131,6 +133,55 @@ test('kehadiran: absensi hari Sabtu tidak ikut menaikkan rasio (di luar cakupan 
     $final = $this->service->calculateForUser($staf, $this->period);
 
     expect((float) $final->score_kehadiran)->toBe(0.0);
+});
+
+test('apel & kegiatan: belum ada event untuk pegawai di periode ini -> skor penuh', function () {
+    $staf = User::factory()->create(['job_level' => 4]);
+
+    $final = $this->service->calculateForUser($staf, $this->period);
+
+    expect((float) $final->score_apel)->toBe(5.0);
+});
+
+test('apel & kegiatan: hadir & telat selalu kredit penuh (approval telat cuma anotasi), tidak hadir cuma kredit kalau alasan disetujui HR', function () {
+    $staf = User::factory()->create(['job_level' => 4]);
+
+    $rows = [
+        ['status' => 'HADIR', 'approval_status' => null],
+        ['status' => 'TELAT', 'approval_status' => null],
+        ['status' => 'TELAT', 'approval_status' => 'REJECTED'],
+        ['status' => 'TIDAK_HADIR', 'approval_status' => 'APPROVED'],
+        ['status' => 'TIDAK_HADIR', 'approval_status' => 'PENDING'],
+        ['status' => 'TIDAK_HADIR', 'approval_status' => 'REJECTED'],
+        ['status' => null, 'approval_status' => null],
+    ];
+
+    foreach ($rows as $i => $row) {
+        $event = KpiMandatoryEvent::create(['date' => Carbon::create(2026, 6, $i + 1), 'name' => 'Kegiatan '.$i]);
+        KpiMandatoryEventParticipant::create([
+            'kpi_mandatory_event_id' => $event->id,
+            'user_id' => $staf->id,
+            'status' => $row['status'],
+            'approval_status' => $row['approval_status'],
+        ]);
+    }
+
+    $final = $this->service->calculateForUser($staf, $this->period);
+
+    // Kredit: HADIR + TELAT + TELAT(rejected, tetap kredit) + TIDAK_HADIR APPROVED = 4 dari 7 partisipasi.
+    expect((float) $final->score_apel)->toBe(round((4 / 7) * 5, 2));
+});
+
+test('apel & kegiatan: event di luar bulan periode tidak ikut dihitung', function () {
+    $staf = User::factory()->create(['job_level' => 4]);
+
+    $eventLuarPeriode = KpiMandatoryEvent::create(['date' => '2026-05-15', 'name' => 'Apel Mei']);
+    KpiMandatoryEventParticipant::create(['kpi_mandatory_event_id' => $eventLuarPeriode->id, 'user_id' => $staf->id, 'status' => 'TIDAK_HADIR']);
+
+    $final = $this->service->calculateForUser($staf, $this->period);
+
+    // Tidak ada event Juni untuk pegawai ini -> denominator 0 -> skor penuh, tidak dihukum oleh event Mei.
+    expect((float) $final->score_apel)->toBe(5.0);
 });
 
 test('pakaian dinas: dedup harian, deduction_point 0 fallback ke default 5', function () {

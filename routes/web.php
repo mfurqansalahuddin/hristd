@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Web\AccountDeletionController;
 use App\Http\Controllers\Web\AttendanceController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CutiController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\DeletionRequestController;
 use App\Http\Controllers\Web\DinasLuarController;
 use App\Http\Controllers\Web\EmployeeController;
 use App\Http\Controllers\Web\JabatanController;
@@ -12,6 +14,7 @@ use App\Http\Controllers\Web\KpiFinalScoreController;
 use App\Http\Controllers\Web\KpiPeriodController;
 use App\Http\Controllers\Web\KpiViolationController;
 use App\Http\Controllers\Web\LocationController;
+use App\Http\Controllers\Web\MandatoryEventController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\SakitController;
 use Illuminate\Support\Facades\Route;
@@ -24,6 +27,11 @@ Route::get('/signin', [AuthController::class, 'showLoginForm'])->name('signin');
 Route::post('/signin', [AuthController::class, 'login'])->name('signin.store');
 
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
+Route::get('/privacy-policy', fn () => view('pages.privacy-policy'))->name('privacy-policy');
+
+Route::get('/hapus-akun', [AccountDeletionController::class, 'create'])->name('account-deletion.create');
+Route::post('/hapus-akun', [AccountDeletionController::class, 'store'])->name('account-deletion.store');
 
 // error pages (preview routes; real exceptions auto-render resources/views/errors/*)
 Route::get('/error-403', fn () => view('errors.403'))->name('error-403');
@@ -45,6 +53,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
 
     Route::get('/attendances', [AttendanceController::class, 'index'])->name('attendances.index');
 
+    Route::get('/apel-kegiatan', [MandatoryEventController::class, 'index'])->name('mandatory-events.index');
+    Route::get('/apel-kegiatan/{mandatoryEvent}', [MandatoryEventController::class, 'show'])->name('mandatory-events.show');
+
     Route::get('/kpi-periods', [KpiPeriodController::class, 'index'])->name('kpi-periods.index');
 
     Route::get('/kpi-categories', [KpiCategoryController::class, 'index'])->name('kpi-categories.index');
@@ -57,4 +68,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/cuti', [CutiController::class, 'index'])->name('cuti.index');
     Route::get('/sakit', [SakitController::class, 'index'])->name('sakit.index');
     Route::get('/dinas-luar', [DinasLuarController::class, 'index'])->name('dinas-luar.index');
+
+    Route::get('/deletion-requests', [DeletionRequestController::class, 'index'])->name('deletion-requests.index');
 });

@@ -140,8 +140,12 @@
                                         {{ $position['holder'] ? 'Ganti' : 'Tetapkan' }}
                                     </button>
                                     @if ($position['holder'])
-                                        <button type="button" wire:click="vacate({{ $department->id }})"
-                                            wire:confirm="Kosongkan jabatan ini? Pemegang lama akan kembali menjadi Staf."
+                                        <button type="button" x-data
+                                            @click="$store.confirmDialog.open({
+                                                title: 'Kosongkan Jabatan',
+                                                message: 'Kosongkan jabatan ' + @js($department->name) + ' (saat ini dijabat ' + @js($position['holder']->name) + ')? Pemegang lama akan kembali menjadi Staf.',
+                                                onConfirm: () => $wire.vacate({{ $department->id }})
+                                            })"
                                             class="text-sm text-error-500 hover:underline">
                                             Hapus
                                         </button>

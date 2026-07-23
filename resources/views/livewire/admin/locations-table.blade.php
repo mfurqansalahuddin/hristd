@@ -56,7 +56,12 @@
                             <td class="px-5 py-4 sm:px-6">
                                 <div class="flex items-center gap-3">
                                     <a href="{{ route('admin.locations.edit', $location) }}" class="text-sm text-brand-500 hover:underline">Edit</a>
-                                    <button type="button" wire:click="delete({{ $location->id }})" wire:confirm="Hapus lokasi kantor ini?"
+                                    <button type="button" x-data
+                                        @click="$store.confirmDialog.open({
+                                            title: 'Hapus Lokasi Kantor',
+                                            message: 'Hapus lokasi kantor ' + @js($location->name) + '?',
+                                            onConfirm: () => $wire.delete({{ $location->id }})
+                                        })"
                                         class="text-sm text-error-500 hover:underline">Hapus</button>
                                 </div>
                             </td>

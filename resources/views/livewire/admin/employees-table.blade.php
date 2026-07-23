@@ -79,7 +79,12 @@
                             <td class="px-5 py-4 sm:px-6">
                                 <div class="flex items-center gap-3">
                                     <a href="{{ route('admin.employees.edit', $employee) }}" class="text-sm text-brand-500 hover:underline">Edit</a>
-                                    <button type="button" wire:click="delete({{ $employee->id }})" wire:confirm="Hapus pegawai ini?"
+                                    <button type="button" x-data
+                                        @click="$store.confirmDialog.open({
+                                            title: 'Hapus Pegawai',
+                                            message: 'Hapus pegawai ' + @js($employee->name) + ' (NIK ' + @js($employee->nik) + ')?',
+                                            onConfirm: () => $wire.delete({{ $employee->id }})
+                                        })"
                                         class="text-sm text-error-500 hover:underline">Hapus</button>
                                 </div>
                             </td>

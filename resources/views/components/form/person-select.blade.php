@@ -7,6 +7,7 @@
     'placeholder' => 'Cari nama / NIK...',
     'required' => false,
     'nullable' => false,
+    'startExpanded' => false,
 ])
 
 @php
@@ -30,7 +31,10 @@
     x-data="{
         query: '',
         open: false,
-        multiMode: false,
+        // startExpanded: dipakai peserta kegiatan (mandatory-events) yang diisi bulk dari server
+        // (bukan klik satu-satu) - tanpa ini, chip-list tersembunyi sampai user klik tombol pilih
+        // lebih dari satu secara manual, padahal peserta sudah terisi banyak dari awal.
+        multiMode: {{ $startExpanded ? 'true' : 'false' }},
         menuStyle: '',
         options: @js($items),
         selected: (() => {
@@ -127,15 +131,28 @@
     </div>
 
     @if ($multiple)
-        <div x-show="multiMode && selected.length" x-cloak class="mt-2 flex flex-wrap gap-2">
-            <template x-for="id in selected" :key="id">
-                <div
-                    class="group flex items-center gap-1 rounded-full border border-gray-200 bg-gray-100 py-1 pr-2 pl-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white/90">
-                    <span x-text="nameOf(id)"></span>
-                    <button type="button" @click="remove(id)"
-                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">&times;</button>
+        <div x-show="multiMode && selected.length" x-cloak x-data="{
+            listOpen: true,
+            // Lebar kolom ikut nama terpanjang (dalam ch) supaya nama tidak kepotong, dibatasi biar tidak selebar layar kalau ada nama sangat panjang.
+            get columnCh() { return Math.min(Math.max(...selected.map(id => nameOf(id).length), 10) + 3, 26); },
+        }" class="mt-2 rounded-lg border border-gray-200 dark:border-gray-700">
+            <button type="button" @click="listOpen = !listOpen"
+                class="flex w-full items-center justify-between px-3 py-2 text-sm text-gray-600 dark:text-gray-300">
+                <span x-text="'Peserta Terpilih (' + selected.length + ')'"></span>
+                <span x-text="listOpen ? '▲ Sembunyikan' : '▼ Tampilkan'"></span>
+            </button>
+            <div x-show="listOpen" class="max-h-[22rem] overflow-y-auto border-t border-gray-100 p-2 dark:border-gray-800">
+                <div class="grid gap-2" :style="'grid-template-columns: repeat(auto-fill, minmax(' + columnCh + 'ch, 1fr))'">
+                    <template x-for="id in selected" :key="id">
+                        <div
+                            class="group flex min-w-0 items-center justify-between gap-1 rounded-full border border-gray-200 bg-gray-100 py-1 pr-2 pl-3 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-white/90">
+                            <span class="truncate" x-text="nameOf(id)"></span>
+                            <button type="button" @click="remove(id)"
+                                class="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">&times;</button>
+                        </div>
+                    </template>
                 </div>
-            </template>
+            </div>
         </div>
     @endif
 

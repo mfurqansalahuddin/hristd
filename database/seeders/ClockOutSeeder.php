@@ -27,7 +27,7 @@ class ClockOutSeeder extends AttendanceSeeder
         $seeded = 0;
 
         foreach ($attendances as $attendance) {
-            $user = User::find($attendance->user_id);
+            $user = User::findOrFail($attendance->user_id);
             $homeLocation = $this->resolveHomeLocation($user, $locations);
             [$lat, $long] = $homeLocation ? $this->pointFor($homeLocation, fake()->boolean(80)) : [null, null];
             $matched = $lat !== null && $locations->contains(fn (Location $l) => $l->containsPoint($lat, $long));
