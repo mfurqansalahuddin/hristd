@@ -3,11 +3,7 @@
 @section('content')
     <x-common.page-breadcrumb :pageTitle="$title" />
 
-    @if (session('success'))
-        <div class="mb-6">
-            <x-ui.alert variant="success" :message="session('success')" />
-        </div>
-    @endif
+    <x-ui.flash-success />
 
     <x-common.component-card :title="$title">
         <form method="POST" enctype="multipart/form-data" action="{{ route('admin.profile.update') }}">

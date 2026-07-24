@@ -3,11 +3,7 @@
 @section('content')
     <x-common.page-breadcrumb :pageTitle="$title" />
 
-    @if (session('success'))
-        <div class="mb-6">
-            <x-ui.alert variant="success" :message="session('success')" />
-        </div>
-    @endif
+    <x-ui.flash-success />
 
     <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">

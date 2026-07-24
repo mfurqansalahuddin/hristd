@@ -1,9 +1,5 @@
 <div>
-    @if (session('success'))
-        <div class="mb-6">
-            <x-ui.alert variant="success" :message="session('success')" />
-        </div>
-    @endif
+    <x-ui.flash-success />
 
     <div class="mb-6 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
         <h3 class="text-base font-medium text-gray-800 dark:text-white/90">{{ $event->name }}</h3>

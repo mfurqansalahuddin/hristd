@@ -1,9 +1,5 @@
 <div>
-    @if (session('success'))
-        <div class="mb-6">
-            <x-ui.alert variant="success" :message="session('success')" />
-        </div>
-    @endif
+    <x-ui.flash-success />
 
     <div class="mb-6 flex gap-2">
         <button type="button" wire:click="$set('mode', 'periode')"

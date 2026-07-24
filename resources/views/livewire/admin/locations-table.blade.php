@@ -1,9 +1,5 @@
 <div>
-    @if (session('success'))
-        <div class="mb-6">
-            <x-ui.alert variant="success" :message="session('success')" />
-        </div>
-    @endif
+    <x-ui.flash-success />
 
     <div class="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]" wire:loading.class="opacity-60">
         <div class="flex flex-col gap-3 border-b border-gray-100 p-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:p-6 dark:border-gray-800">

@@ -16,9 +16,7 @@
                 </div>
 
                 @if (session('success'))
-                    <div class="mb-6">
-                        <x-ui.alert variant="success" :message="session('success')" />
-                    </div>
+                    <x-ui.flash-success />
                 @else
                     <form action="{{ route('account-deletion.store') }}" method="POST" class="space-y-5">
                         @csrf

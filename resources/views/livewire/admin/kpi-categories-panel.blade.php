@@ -1,9 +1,5 @@
 <div>
-    @if (session('success'))
-        <div class="mb-6">
-            <x-ui.alert variant="success" :message="session('success')" />
-        </div>
-    @endif
+    <x-ui.flash-success />
 
     <div class="mb-6">
         <x-common.component-card title="Bobot & Kriteria Penilaian KPI" desc="Total seluruh baris di bawah (komponen tetap + kriteria tambahan yang aktif) harus selalu 100%.">

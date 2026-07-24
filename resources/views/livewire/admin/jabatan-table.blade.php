@@ -2,11 +2,7 @@
     $typeLabels = \App\Models\Department::TYPE_LABELS;
 @endphp
 <div>
-    @if (session('success'))
-        <div class="mb-6">
-            <x-ui.alert variant="success" :message="session('success')" />
-        </div>
-    @endif
+    <x-ui.flash-success />
 
     <div class="mb-4 flex justify-end">
         @unless ($showCreateForm)
