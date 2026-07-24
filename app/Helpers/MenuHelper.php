@@ -27,6 +27,7 @@ class MenuHelper
                 'subItems' => [
                     ['name' => 'Periode KPI', 'path' => '/admin/kpi-periods'],
                     ['name' => 'Master Kategori', 'path' => '/admin/kpi-categories'],
+                    ['name' => 'Master Fase', 'path' => '/admin/kpi-period-phases'],
                     ['name' => 'Validasi Aduan', 'path' => '/admin/kpi-violations'],
                     ['name' => 'Nilai Akhir & Persentase Gaji', 'path' => '/admin/kpi-final-scores'],
                 ],

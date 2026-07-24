@@ -90,13 +90,61 @@ test('alasan yang sudah tersimpan terkunci (ringkas) sampai diubah manual atau s
         ->toBe(['hadir' => 0, 'telat' => 0, 'tidak_hadir' => 1]);
 
     // Sudah tersimpan & bersih -> kotak alasan terkunci: tombol "Ubah" tampil, bukan "Kunci".
-    $component->assertSee('Ubah')->assertDontSee('Kunci');
+    $component->assertSee('Ubah')->assertDontSee('Kunci Alasan');
 
     // Klik "Ubah" membuka lagi kotak alasan untuk diedit.
-    $component->call('editReason', $participant->id)->assertSee('Kunci');
+    $component->call('editReason', $participant->id)->assertSee('Kunci Alasan');
 
     // Tanpa editReason(): mengganti status membuat baris dirty lagi, otomatis membuka kotak alasan.
     Livewire::test(MandatoryEventAttendanceForm::class, ['event' => $event])
         ->set("edits.{$participant->id}.status", 'TELAT')
-        ->assertSee('Kunci');
+        ->assertSee('Kunci Alasan');
+});
+
+test('pesan validasi alasan wajib diisi memakai bahasa Indonesia, bukan path field mentah', function () {
+    $bagian = Department::create(['name' => 'Bagian Keuangan', 'type' => 'BAGIAN']);
+    $staff = User::factory()->create(['job_level' => 4, 'department_id' => $bagian->id, 'name' => 'Rani Staff']);
+
+    $event = KpiMandatoryEvent::create(['name' => 'Apel Sore', 'date' => now()->toDateString()]);
+    $participant = $event->participants()->create(['user_id' => $staff->id]);
+
+    Livewire::test(MandatoryEventAttendanceForm::class, ['event' => $event])
+        ->set("edits.{$participant->id}.status", 'TIDAK_HADIR')
+        ->call('save', $participant->id)
+        ->assertHasErrors(["edits.{$participant->id}.reason" => 'required_if'])
+        ->assertSee('Alasan wajib diisi untuk status Tidak Hadir.')
+        ->assertDontSee("edits.{$participant->id}.reason field is required");
+});
+
+test('kunci presensi bersifat permanen: setelah dikunci, status/alasan/approval tidak bisa diubah lagi', function () {
+    $bagian = Department::create(['name' => 'Bagian Keuangan', 'type' => 'BAGIAN']);
+    $staff = User::factory()->create(['job_level' => 4, 'department_id' => $bagian->id, 'name' => 'Rani Staff']);
+
+    $event = KpiMandatoryEvent::create(['name' => 'Apel Sore', 'date' => now()->toDateString()]);
+    $participant = $event->participants()->create(['user_id' => $staff->id]);
+
+    $component = Livewire::test(MandatoryEventAttendanceForm::class, ['event' => $event])
+        ->set("edits.{$participant->id}.status", 'TIDAK_HADIR')
+        ->set("edits.{$participant->id}.reason", 'Sakit, ada surat dokter')
+        ->call('save', $participant->id)
+        ->call('lock');
+
+    expect($event->refresh()->locked_at)->not->toBeNull();
+    $component->assertSee('Terkunci');
+
+    // Setelah terkunci: ganti status, simpan, editReason, dan approve/reject semuanya no-op.
+    $component
+        ->set("edits.{$participant->id}.status", 'HADIR')
+        ->call('save', $participant->id)
+        ->call('editReason', $participant->id)
+        ->call('approve', $participant->id);
+
+    $participant->refresh();
+    expect($participant->status)->toBe('TIDAK_HADIR')
+        ->and($participant->approval_status)->toBe('PENDING');
+
+    // Kunci ulang tidak menggeser waktu kunci yang sudah tercatat.
+    $lockedAt = $event->refresh()->locked_at;
+    $component->call('lock');
+    expect($event->refresh()->locked_at)->toEqual($lockedAt);
 });

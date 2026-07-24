@@ -4,9 +4,9 @@ namespace App\Livewire\Admin;
 
 use App\Livewire\Concerns\PaginatesRows;
 use App\Livewire\Concerns\SortsColumns;
-use App\Models\KpiCycleSchedule;
 use App\Models\KpiFinalScore;
 use App\Models\KpiPeriod;
+use App\Models\KpiPeriodPhase;
 use App\Models\KpiPlan;
 use App\Models\User;
 use App\Services\KpiEvaluationService;
@@ -70,7 +70,12 @@ class KpiPeriodsTable extends Component
             'year' => ['required', 'integer', 'min:2020'],
         ]);
 
-        KpiPeriod::create($data);
+        $period = KpiPeriod::create($data);
+
+        // Baris fase dibuat kosong (tanggal null) — admin isi tanggalnya sendiri lewat panel Master Fase.
+        foreach (KpiPeriodPhase::PHASES as $phase) {
+            $period->phases()->create(['phase' => $phase]);
+        }
 
         $this->confirmingCreate = false;
         session()->flash('success', 'Periode KPI berhasil dibuka.');
@@ -138,14 +143,15 @@ class KpiPeriodsTable extends Component
     }
 
     /**
-     * Banner read-only: bandingkan tanggal hari ini vs fase yang seharusnya menurut master
-     * jadwal (`kpi_cycle_schedule`) vs status periode berjalan yang sebenarnya — supaya HRD
-     * tidak lupa pindah fase manual (dikonfirmasi user: tetap manual, bukan otomatis).
+     * Banner read-only: bandingkan fase yang seharusnya aktif hari ini menurut tanggal yang
+     * diisi admin di Master Fase (`kpi_period_phases`) vs status periode berjalan yang
+     * sebenarnya — supaya HRD tidak lupa pindah fase manual (dikonfirmasi user: tetap manual,
+     * bukan otomatis).
      */
     private function scheduleWarning(): ?string
     {
-        $expectedPhase = KpiCycleSchedule::phaseForDay(now()->day);
         $current = KpiPeriod::current();
+        $expectedPhase = KpiPeriodPhase::currentFor($current);
 
         if (! $expectedPhase || ! $current) {
             return null;

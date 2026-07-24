@@ -1,14 +1,32 @@
 <div>
     <x-ui.flash-success />
 
-    <div class="mb-6 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
-        <h3 class="text-base font-medium text-gray-800 dark:text-white/90">{{ $event->name }}</h3>
-        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {{ $event->date->format('d-m-Y') }}
-            @if ($event->time)
-                &middot; {{ \Illuminate\Support\Carbon::parse($event->time)->format('H:i') }}
-            @endif
-        </p>
+    <div class="mb-6 flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <div>
+            <h3 class="text-base font-medium text-gray-800 dark:text-white/90">{{ $event->name }}</h3>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ $event->date->format('d-m-Y') }}
+                @if ($event->time)
+                    &middot; {{ \Illuminate\Support\Carbon::parse($event->time)->format('H:i') }}
+                @endif
+            </p>
+        </div>
+
+        @if ($event->locked_at)
+            <x-ui.badge color="error">Terkunci</x-ui.badge>
+        @else
+            <button type="button" x-data
+                @click="$store.confirmDialog.open({
+                    title: 'Kunci Presensi',
+                    message: 'Kunci presensi kegiatan ini? Setelah dikunci, presensi TIDAK BISA diubah lagi oleh siapa pun.',
+                    confirmText: 'Kunci',
+                    variant: 'danger',
+                    onConfirm: () => $wire.lock()
+                })"
+                class="shrink-0 rounded-lg border border-error-500 px-4 py-2 text-sm font-medium text-error-500 hover:bg-error-50 dark:hover:bg-error-500/10">
+                Kunci Presensi
+            </button>
+        @endif
     </div>
 
     <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">

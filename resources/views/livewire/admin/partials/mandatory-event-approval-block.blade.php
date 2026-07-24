@@ -1,4 +1,6 @@
-@if ($participant->approval_status === 'PENDING')
+@if ($participant->approval_status === 'PENDING' && $this->isLocked())
+    <x-ui.badge color="warning">Menunggu</x-ui.badge>
+@elseif ($participant->approval_status === 'PENDING')
     <div class="flex items-center gap-2">
         <button type="button" wire:click="approve({{ $participant->id }})"
             class="rounded-lg bg-success-50 px-2.5 py-1.5 text-xs font-medium text-success-600 hover:bg-success-100 dark:bg-success-500/15 dark:text-success-500">Approve</button>

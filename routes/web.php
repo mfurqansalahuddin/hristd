@@ -12,6 +12,7 @@ use App\Http\Controllers\Web\JabatanController;
 use App\Http\Controllers\Web\KpiCategoryController;
 use App\Http\Controllers\Web\KpiFinalScoreController;
 use App\Http\Controllers\Web\KpiPeriodController;
+use App\Http\Controllers\Web\KpiPeriodPhaseController;
 use App\Http\Controllers\Web\KpiViolationController;
 use App\Http\Controllers\Web\LocationController;
 use App\Http\Controllers\Web\MandatoryEventController;
@@ -59,6 +60,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/kpi-periods', [KpiPeriodController::class, 'index'])->name('kpi-periods.index');
 
     Route::get('/kpi-categories', [KpiCategoryController::class, 'index'])->name('kpi-categories.index');
+
+    Route::get('/kpi-period-phases', [KpiPeriodPhaseController::class, 'index'])->name('kpi-period-phases.index');
 
     Route::get('/kpi-violations', [KpiViolationController::class, 'index'])->name('kpi-violations.index');
 

@@ -194,6 +194,7 @@
             <!-- app header start -->
             @include('layouts.app-header')
             <!-- app header end -->
+            <livewire:admin.kpi-cycle-banner />
             <div class="p-4 mx-auto max-w-(--breakpoint-2xl) md:p-6">
                 @yield('content')
             </div>

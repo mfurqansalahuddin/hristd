@@ -29,7 +29,4 @@
             <p class="text-gray-400 text-theme-sm">-</p>
         @endif
     </td>
-    <td class="px-5 py-4 sm:px-6">
-        @include('livewire.admin.partials.mandatory-event-save-button', ['participant' => $participant])
-    </td>
 </tr>

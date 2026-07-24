@@ -35,11 +35,73 @@ class MandatoryEventAttendanceForm extends Component
         return ($this->edits[$participantId] ?? null) !== ($this->savedEdits[$participantId] ?? null);
     }
 
+    public function isLocked(): bool
+    {
+        return $this->event->locked_at !== null;
+    }
+
+    /** Kunci presensi kegiatan ini secara permanen - lihat tombol "Kunci Presensi" & konfirmasi di view. */
+    public function lock(): void
+    {
+        if ($this->isLocked()) {
+            return;
+        }
+
+        $this->event->update(['locked_at' => now()]);
+
+        session()->flash('success', 'Presensi kegiatan ini sudah dikunci & tidak bisa diubah lagi.');
+    }
+
     public function save(int $participantId): void
+    {
+        if ($this->isLocked()) {
+            return;
+        }
+
+        $this->persist($participantId);
+
+        session()->flash('success', 'Presensi tersimpan.');
+    }
+
+    /** Simpan semua peserta yang berubah dalam satu kelompok sekaligus - lihat tombol "Simpan" di header kelompok. */
+    public function saveGroup(array $participantIds): void
+    {
+        if ($this->isLocked()) {
+            return;
+        }
+
+        $dirtyIds = array_filter($participantIds, fn ($id) => $this->isDirty((int) $id));
+
+        foreach ($dirtyIds as $id) {
+            $this->persist((int) $id);
+        }
+
+        if ($dirtyIds !== []) {
+            session()->flash('success', 'Presensi kelompok tersimpan.');
+        }
+    }
+
+    public function isGroupDirty(array $participantIds): bool
+    {
+        foreach ($participantIds as $id) {
+            if ($this->isDirty((int) $id)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function persist(int $participantId): void
     {
         $data = $this->validate([
             "edits.{$participantId}.status" => ['required', 'string', 'in:HADIR,TELAT,TIDAK_HADIR'],
             "edits.{$participantId}.reason" => ['nullable', 'string', 'max:1000', 'required_if:edits.'.$participantId.'.status,TIDAK_HADIR'],
+        ], [
+            "edits.{$participantId}.status.required" => 'Status kehadiran wajib dipilih.',
+            "edits.{$participantId}.status.in" => 'Status kehadiran tidak valid.',
+            "edits.{$participantId}.reason.max" => 'Alasan maksimal 1000 karakter.',
+            "edits.{$participantId}.reason.required_if" => 'Alasan wajib diisi untuk status Tidak Hadir.',
         ])['edits'][$participantId];
 
         $participant = KpiMandatoryEventParticipant::findOrFail($participantId);
@@ -55,13 +117,15 @@ class MandatoryEventAttendanceForm extends Component
 
         $this->savedEdits[$participantId] = $this->edits[$participantId];
         unset($this->reasonEditing[$participantId]);
-
-        session()->flash('success', 'Presensi tersimpan.');
     }
 
     /** Buka lagi kotak alasan yang sudah terkunci (sudah tersimpan & bersih) supaya bisa diubah tanpa mengganti status. */
     public function editReason(int $participantId): void
     {
+        if ($this->isLocked()) {
+            return;
+        }
+
         $this->reasonEditing[$participantId] = true;
     }
 
@@ -75,6 +139,10 @@ class MandatoryEventAttendanceForm extends Component
 
     public function approve(int $participantId): void
     {
+        if ($this->isLocked()) {
+            return;
+        }
+
         KpiMandatoryEventParticipant::whereKey($participantId)->update(['approval_status' => 'APPROVED']);
 
         session()->flash('success', 'Alasan disetujui.');
@@ -82,6 +150,10 @@ class MandatoryEventAttendanceForm extends Component
 
     public function reject(int $participantId): void
     {
+        if ($this->isLocked()) {
+            return;
+        }
+
         KpiMandatoryEventParticipant::whereKey($participantId)->update(['approval_status' => 'REJECTED']);
 
         session()->flash('success', 'Alasan ditolak.');

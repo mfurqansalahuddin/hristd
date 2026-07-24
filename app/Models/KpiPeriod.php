@@ -123,4 +123,9 @@ class KpiPeriod extends Model
     {
         return $this->hasMany(KpiFinalScore::class, 'period_id');
     }
+
+    public function phases()
+    {
+        return $this->hasMany(KpiPeriodPhase::class, 'kpi_period_id');
+    }
 }

@@ -25,6 +25,4 @@
             @include('livewire.admin.partials.mandatory-event-approval-block', ['participant' => $participant])
         </div>
     @endif
-
-    @include('livewire.admin.partials.mandatory-event-save-button', ['participant' => $participant, 'block' => true])
 </div>
